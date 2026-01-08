@@ -1,0 +1,49 @@
+const express = require('express');
+const router = express.Router();
+const passport = require('passport');
+const {
+  register,
+  login,
+  getMe,
+  googleCallback,
+  logout,
+  verifyOTP,
+  resendOTP,
+} = require('../controllers/authController');
+const { protect } = require('../middleware/auth');
+
+// Public routes
+router.post('/register', register);
+router.post('/login', login);
+router.post('/verify-otp', verifyOTP);
+router.post('/resend-otp', resendOTP);
+router.post('/logout', protect, logout);
+
+// Google OAuth routes (only if configured)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  router.get(
+    '/google',
+    passport.authenticate('google', {
+      scope: ['profile', 'email'],
+    })
+  );
+
+  router.get(
+    '/google/callback',
+    passport.authenticate('google', { session: false }),
+    googleCallback
+  );
+} else {
+  // Return error if Google OAuth is not configured
+  router.get('/google', (req, res) => {
+    res.status(503).json({
+      success: false,
+      error: 'Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in environment variables.',
+    });
+  });
+}
+
+// Protected routes
+router.get('/me', protect, getMe);
+
+module.exports = router;
