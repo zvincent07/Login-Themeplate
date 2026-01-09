@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    allowedHosts: [
+      'cosmogonal-tashia-phonematic.ngrok-free.dev',
+      'localhost',
+      '.localhost',
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

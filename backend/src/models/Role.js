@@ -26,7 +26,6 @@ const roleSchema = new mongoose.Schema(
   }
 );
 
-// Index for faster lookups
-roleSchema.index({ name: 1 });
+// Note: name index is automatically created by unique: true
 
 module.exports = mongoose.model('Role', roleSchema);

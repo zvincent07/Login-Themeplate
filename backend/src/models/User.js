@@ -86,8 +86,9 @@ const userSchema = new mongoose.Schema(
 );
 
 // Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ googleId: 1 });
+// Note: email index is automatically created by unique: true
+// googleId index (sparse for OAuth users)
+userSchema.index({ googleId: 1 }, { sparse: true });
 userSchema.index({ roleName: 1 });
 
 // Hash password before saving
