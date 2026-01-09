@@ -24,12 +24,23 @@ const authService = {
   },
 
   // Login user
-  login: async (email, password, turnstileToken) => {
+  login: async (email, password, turnstileToken, rememberMe = false) => {
     return await api.post(`${API_ENDPOINTS.auth}/login`, { 
       email, 
       password,
-      turnstileToken 
+      turnstileToken,
+      rememberMe
     });
+  },
+
+  // Forgot password
+  forgotPassword: async (email) => {
+    return await api.post(`${API_ENDPOINTS.auth}/forgot-password`, { email });
+  },
+
+  // Reset password
+  resetPassword: async (token, password) => {
+    return await api.post(`${API_ENDPOINTS.auth}/reset-password`, { token, password });
   },
 
   // Get current user

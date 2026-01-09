@@ -1,12 +1,13 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const User = require('../models/User');
 const Role = require('../models/Role');
-const generateToken = require('../utils/generateToken');
+const { generateToken, generateResetToken } = require('../utils/generateToken');
 const validatePasswordStrength = require('../utils/passwordValidator');
 const { generateOTP, getOTPExpiry } = require('../utils/generateOTP');
-const { sendOTPEmail } = require('../services/emailService');
+const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService');
 const verifyTurnstile = require('../utils/verifyTurnstile');
 const config = require('../config');
+const crypto = require('crypto');
 
 // @desc    Register User (Public - only for 'user' role)
 // @route   POST /api/auth/register
@@ -225,7 +226,7 @@ exports.resendOTP = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
-  const { email, password, turnstileToken } = req.body;
+  const { email, password, turnstileToken, rememberMe } = req.body;
 
   // Validate email & password
   if (!email || !password) {
@@ -288,8 +289,9 @@ exports.login = asyncHandler(async (req, res) => {
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
-  // Generate token
-  const token = generateToken(user._id);
+  // Generate token with extended expiration if "remember me" is checked
+  const tokenExpiration = rememberMe ? '30d' : config.jwtExpire;
+  const token = generateToken(user._id, tokenExpiration);
 
   res.status(200).json({
     success: true,
@@ -360,5 +362,132 @@ exports.logout = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Logged out successfully',
+  });
+});
+
+// @desc    Forgot Password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email is required',
+    });
+  }
+
+  // Include password field to check if user has a password (OAuth users don't have passwords)
+  const user = await User.findOne({ email }).select('+password');
+
+  // Don't reveal if user exists or not (security best practice)
+  if (!user) {
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email, a password reset link has been sent.',
+    });
+  }
+
+  // Check if user has a password (OAuth users don't have passwords)
+  if (!user.password) {
+    return res.status(400).json({
+      success: false,
+      error: 'This account uses social login. Please use Google to sign in.',
+    });
+  }
+
+  // Generate reset token
+  const { resetToken, hashedToken } = generateResetToken();
+  const resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  // Save hashed token to database
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = resetPasswordExpire;
+  await user.save({ validateBeforeSave: false });
+
+  // Create reset URL
+  const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
+
+  try {
+    await sendPasswordResetEmail(user.email, resetUrl, user.firstName || 'User');
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent successfully',
+    });
+  } catch (error) {
+    // If email fails, clear reset token
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to send password reset email. Please try again.',
+    });
+  }
+});
+
+// @desc    Reset Password
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Token and password are required',
+    });
+  }
+
+  // Hash the token to compare with database
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  // Find user with valid reset token
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  }).select('+password');
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid or expired reset token',
+    });
+  }
+
+  // Validate password strength
+  const passwordValidation = validatePasswordStrength(password);
+  if (!passwordValidation.isValid) {
+    return res.status(400).json({
+      success: false,
+      error: 'Password does not meet requirements',
+      details: passwordValidation.errors,
+    });
+  }
+
+  // Set new password
+  user.password = password;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+  await user.save();
+
+  // Generate token for automatic login
+  const authToken = generateToken(user._id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset successfully',
+    token: authToken,
+    data: {
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roleName: user.roleName,
+      },
+    },
   });
 });
