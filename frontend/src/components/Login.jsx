@@ -143,7 +143,7 @@ const Login = () => {
       
       <div className="w-full grid md:grid-cols-2">
         {/* Left Side - Login Form */}
-        <div className="w-full bg-gradient-to-br from-white via-gray-50 to-blue-50/30 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4 sm:p-6 order-2 md:order-1">
+        <div className="w-full bg-gradient-to-br from-white via-blue-50/50 to-indigo-50/60 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4 sm:p-6 order-2 md:order-1">
           <div className="w-full max-w-[420px]">
               <div className="mb-6 sm:mb-8">
                 <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-slate-100 mb-1.5">
