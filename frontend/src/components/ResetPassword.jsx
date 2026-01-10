@@ -25,12 +25,14 @@ const ResetPassword = () => {
     // This ensures the user can reset their password even if they're logged in
     const tokenParam = searchParams.get('token');
     
+    let redirectTimeout;
+    
     if (!tokenParam) {
       setError('Invalid reset link. Please request a new password reset.');
       setToken('');
       // Redirect to forgot password if no token
-      setTimeout(() => {
-        navigate('/forgot-password');
+      redirectTimeout = setTimeout(() => {
+        navigate('/forgot-password', { replace: true });
       }, 3000);
     } else {
       setToken(tokenParam);
@@ -39,6 +41,13 @@ const ResetPassword = () => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+      }
+    };
   }, [searchParams, navigate]);
 
   const onChange = (e) => {
@@ -78,11 +87,11 @@ const ResetPassword = () => {
 
     try {
       const response = await authService.resetPassword(token, password);
-      if (response.success) {
+      if (response.success && response.data?.user) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        const role = response.data.user.roleName;
+        const role = response.data.user?.roleName || 'user';
         if (role === 'admin') {
           navigate('/admin/dashboard');
         } else if (role === 'employee') {

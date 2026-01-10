@@ -34,7 +34,7 @@ A complete Role-Based Access Control (RBAC) authentication system with Google OA
 
 - ✅ Strong password requirements (8+ chars, uppercase, lowercase, number, special char)
 - ✅ Email OTP verification (6-digit code, 10-minute expiry)
-- ✅ Cloudflare Turnstile bot protection (optional)
+- ✅ Cursor movement-based bot detection with IP banning
 - ✅ Password hashing with bcrypt
 - ✅ JWT token authentication
 - ✅ Role-based access control (RBAC)
@@ -97,8 +97,6 @@ See [SETUP_GUIDE.md](./SETUP_GUIDE.md#google-oauth-setup) for step-by-step instr
 ### Email OTP Setup
 See [SETUP_GUIDE.md](./SETUP_GUIDE.md#email-otp-setup) for step-by-step instructions.
 
-### Cloudflare Turnstile Setup
-See [SETUP_GUIDE.md](./SETUP_GUIDE.md#cloudflare-turnstile-setup-optional---bot-protection) for step-by-step instructions.
 
 ## 🔐 Default Admin Account
 
@@ -134,7 +132,7 @@ After seeding, login with:
 - Modern, sleek login/register UI
 - Real-time password strength indicator
 - OTP verification screen
-- Cloudflare Turnstile integration
+- Cursor movement tracking for bot detection
 - Responsive design (mobile-friendly)
 - Dark mode support
 - Black, white, gray color theme
@@ -173,8 +171,6 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 APP_NAME=RBAC Auth
 
-# Cloudflare Turnstile (Optional)
-TURNSTILE_SECRET_KEY=your-turnstile-secret-key
 ```
 
 ### Frontend (.env)
@@ -182,8 +178,6 @@ TURNSTILE_SECRET_KEY=your-turnstile-secret-key
 ```env
 VITE_API_BASE_URL=http://localhost:5000/api
 
-# Cloudflare Turnstile (Optional)
-VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
 ## 🛠️ Technologies
@@ -215,7 +209,7 @@ VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
 - OTP codes expire after 10 minutes
 - Email verification required before login
 - Strong password requirements enforced
-- Cloudflare Turnstile bot protection (optional)
+- Cursor movement-based bot detection with IP banning
 - Admin account created via secure seeding
 
 ## 📄 License

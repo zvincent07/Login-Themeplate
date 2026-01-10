@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import { checkPasswordStrength, getPasswordRequirements } from '../utils/passwordStrength';
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
+import CursorTracker from '../utils/cursorTracker';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -20,10 +21,25 @@ const Register = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(null);
+  const cursorTrackerRef = useRef(null);
 
   const { firstName, lastName, email, password, confirmPassword } = formData;
 
   const passwordRequirements = getPasswordRequirements();
+
+  // Initialize cursor tracking
+  useEffect(() => {
+    // Create cursor tracker instance
+    cursorTrackerRef.current = new CursorTracker();
+    cursorTrackerRef.current.startTracking();
+
+    // Cleanup on unmount
+    return () => {
+      if (cursorTrackerRef.current) {
+        cursorTrackerRef.current.stopTracking();
+      }
+    };
+  }, []);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -60,6 +76,13 @@ const Register = () => {
       return;
     }
 
+    // Stop cursor tracking and get movement data
+    let movementData = null;
+    if (cursorTrackerRef.current) {
+      cursorTrackerRef.current.stopTracking();
+      movementData = cursorTrackerRef.current.getMovementData();
+    }
+
     setLoading(true);
 
     try {
@@ -68,6 +91,7 @@ const Register = () => {
         lastName,
         email,
         password,
+        movementData,
       });
 
       if (response.success) {
@@ -99,10 +123,17 @@ const Register = () => {
     try {
       const response = await authService.verifyOTP(userId, otp);
 
-      if (response.success) {
+      if (response.success && response.data?.user) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/dashboard');
+        const role = response.data.user?.roleName || 'user';
+        if (role === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (role === 'employee') {
+          navigate('/employee/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err) {
       setError(err.message || 'Invalid OTP. Please try again.');
@@ -202,7 +233,12 @@ const Register = () => {
 
   // Registration Step
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Theme Toggle - Top Right */}
+      <div className="fixed top-4 right-4 z-[9999]">
+        <ThemeToggle />
+      </div>
+      
       <div className="w-full grid md:grid-cols-2">
         {/* Left Side - Register Form */}
         <div className="w-full bg-gradient-to-br from-white via-blue-50/50 to-indigo-50/60 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4 sm:p-6 order-2 md:order-1">
@@ -349,10 +385,10 @@ const Register = () => {
               <div className="mt-5">
                 <div className="relative mb-5">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                    <div className="w-full border-t border-gray-300 dark:border-gray-500"></div>
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="px-2 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400">
+                    <span className="px-2 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300">
                       Or continue with
                     </span>
                   </div>
@@ -388,7 +424,7 @@ const Register = () => {
                 </Button>
               </div>
 
-              <div className="mt-6 text-center">
+              <div className="mt-6 mb-6 pb-4 text-center">
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   Already have an account?{' '}
                   <a

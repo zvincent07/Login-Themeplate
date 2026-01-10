@@ -279,49 +279,6 @@ The backend automatically creates the first admin account on startup:
 
 ---
 
-## Cloudflare Turnstile Setup (Optional - Bot Protection)
-
-Cloudflare Turnstile provides invisible bot protection for your login form.
-
-### Step 1: Get Turnstile Keys
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Navigate to **"Turnstile"** in the sidebar
-3. Click **"Add Site"**
-4. Fill in:
-   - **Site name**: `RBAC Auth`
-   - **Domain**: `localhost` (for development)
-   - **Widget mode**: `Managed` (invisible)
-5. Click **"Create"**
-6. Copy the **Site Key** and **Secret Key**
-
-### Step 2: Add to Frontend .env
-
-Add to `frontend/.env`:
-
-```env
-VITE_TURNSTILE_SITE_KEY=your-site-key-here
-```
-
-### Step 3: Add to Backend .env
-
-Add to `backend/.env`:
-
-```env
-TURNSTILE_SECRET_KEY=your-secret-key-here
-```
-
-### Step 4: Test Turnstile
-
-1. Restart both frontend and backend servers
-2. Go to login page
-3. The Turnstile widget will appear before the "Sign in" button
-4. Complete the verification and try logging in
-
-**Note**: If Turnstile keys are not configured, the widget will use a test key and verification will be skipped on the backend (for development).
-
----
-
 ## AI Chatbot Setup
 
 The application includes an AI-powered chatbot on the login page. You can configure it to use Groq (FREE), OpenAI, or Anthropic Claude.
@@ -455,7 +412,7 @@ If AI API keys are not configured, the chatbot will:
 
 ✅ **Google OAuth**: Configured in Google Cloud Console → Add credentials to `.env`  
 ✅ **Email OTP**: Generate Gmail App Password → Add to `.env`  
-✅ **Cloudflare Turnstile**: Get keys from Cloudflare Dashboard → Add to `.env`  
+✅ **Bot Detection**: Cursor movement tracking automatically detects and bans bots  
 ✅ **AI Chatbot**: Get API key from Groq (FREE)/OpenAI/Anthropic → Add to `.env`  
 ✅ **All features**: Restart backend server → Test registration/login
 

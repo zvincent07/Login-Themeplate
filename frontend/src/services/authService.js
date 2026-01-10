@@ -24,12 +24,12 @@ const authService = {
   },
 
   // Login user
-  login: async (email, password, turnstileToken, rememberMe = false) => {
+  login: async (email, password, rememberMe = false, movementData = null) => {
     return await api.post(`${API_ENDPOINTS.auth}/login`, { 
       email, 
       password,
-      turnstileToken,
-      rememberMe
+      rememberMe,
+      movementData
     });
   },
 
@@ -66,8 +66,15 @@ const authService = {
 
   // Get stored user
   getStoredUser: () => {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return null;
+      return JSON.parse(userStr);
+    } catch (error) {
+      // If JSON is malformed, clear it and return null
+      localStorage.removeItem('user');
+      return null;
+    }
   },
 
   // Get stored token

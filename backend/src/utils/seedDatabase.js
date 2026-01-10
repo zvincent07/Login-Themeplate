@@ -5,8 +5,6 @@ const bcrypt = require('bcryptjs');
 
 const seedDatabase = async () => {
   try {
-    console.log('Starting database seeding...');
-
     // 1. Create Permissions
     const permissions = [
       { name: 'users.create', description: 'Create users', resource: 'users', action: 'create' },
@@ -26,7 +24,6 @@ const seedDatabase = async () => {
       if (!existing) {
         const newPerm = await Permission.create(perm);
         createdPermissions.push(newPerm);
-        console.log(`Created permission: ${perm.name}`);
       } else {
         createdPermissions.push(existing);
       }
@@ -59,7 +56,6 @@ const seedDatabase = async () => {
       if (!existing) {
         const newRole = await Role.create(role);
         createdRoles[role.name] = newRole;
-        console.log(`Created role: ${role.name}`);
       } else {
         createdRoles[role.name] = existing;
       }
@@ -83,22 +79,10 @@ const seedDatabase = async () => {
         isEmailVerified: true,
         isActive: true,
       });
-
-      console.log('========================================');
-      console.log('✅ First Admin Account Created!');
-      console.log('========================================');
-      console.log(`Email: ${adminEmail}`);
-      console.log(`Password: ${adminPassword}`);
-      console.log('========================================');
-      console.log('⚠️  IMPORTANT: Change this password after first login!');
-      console.log('========================================');
-    } else {
-      console.log('Admin user already exists. Skipping admin creation.');
     }
 
-    console.log('Database seeding completed successfully!');
+    // Seeding completed silently
   } catch (error) {
-    console.error('Error seeding database:', error);
     throw error;
   }
 };

@@ -35,22 +35,14 @@ const ThemeToggle = () => {
     const currentIsDark = document.documentElement.classList.contains('dark');
     const newIsDark = !currentIsDark;
     
-    console.log('Toggle theme:', { currentIsDark, newIsDark });
-    
     // Update DOM immediately
     if (newIsDark) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
-      console.log('Added dark class');
     } else {
       document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
-      console.log('Removed dark class');
     }
-    
-    // Verify the change
-    const verifyDark = document.documentElement.classList.contains('dark');
-    console.log('Verified dark class:', verifyDark);
     
     // Update state
     setIsDark(newIsDark);
@@ -63,7 +55,7 @@ const ThemeToggle = () => {
     <button
       type="button"
       onClick={toggleTheme}
-      className="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900 shadow-sm hover:shadow-md z-[9999]"
+      className="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900 shadow-sm hover:shadow-md z-[9999] relative"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       style={{ WebkitTapHighlightColor: 'transparent' }}

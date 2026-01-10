@@ -15,6 +15,8 @@ const Chatbot = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const isProcessingRef = useRef(false);
+  const messagesRef = useRef(messages);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -22,6 +24,11 @@ const Chatbot = () => {
 
   useEffect(() => {
     scrollToBottom();
+  }, [messages]);
+
+  // Keep messagesRef in sync with messages state
+  useEffect(() => {
+    messagesRef.current = messages;
   }, [messages]);
 
   useEffect(() => {
@@ -32,7 +39,7 @@ const Chatbot = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputMessage.trim() || isTyping) return;
+    if (!inputMessage.trim() || isTyping || isProcessingRef.current) return;
 
     const messageText = inputMessage.trim();
     const userMessage = {
@@ -42,46 +49,54 @@ const Chatbot = () => {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Mark as processing to prevent duplicate calls
+    isProcessingRef.current = true;
+    
+    // Update messages with user message first
+    const updatedMessages = [...messagesRef.current, userMessage];
+    setMessages(updatedMessages);
+    messagesRef.current = updatedMessages;
+    
+    // Clear input and set typing state
     setInputMessage('');
     setIsTyping(true);
 
-    try {
-      // Prepare conversation history (exclude the welcome message)
-      const conversationHistory = messages
-        .filter((msg) => msg.id !== 1) // Exclude welcome message
-        .map((msg) => ({
-          text: msg.text,
-          sender: msg.sender,
-        }));
+    // Prepare conversation history from updated messages (exclude the welcome message)
+    const conversationHistory = updatedMessages
+      .filter((msg) => msg.id !== 1) // Exclude welcome message
+      .map((msg) => ({
+        text: msg.text,
+        sender: msg.sender,
+      }));
 
-      // Call AI API
-      const response = await chatbotService.sendMessage(messageText, conversationHistory);
-
-      if (response.success && response.response) {
-        const botMessage = {
+    // Call AI API with conversation history (completely outside state updater)
+    chatbotService.sendMessage(messageText, conversationHistory)
+      .then((response) => {
+        if (response.success && response.response) {
+          const botMessage = {
+            id: Date.now() + 1,
+            text: response.response,
+            sender: 'bot',
+            timestamp: new Date(),
+          };
+          setMessages((prevMsgs) => [...prevMsgs, botMessage]);
+        } else {
+          throw new Error(response.error || 'Failed to get response');
+        }
+      })
+      .catch(() => {
+        const errorMessage = {
           id: Date.now() + 1,
-          text: response.response,
+          text: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment, or contact support directly.",
           sender: 'bot',
           timestamp: new Date(),
         };
-
-        setMessages((prev) => [...prev, botMessage]);
-      } else {
-        throw new Error(response.error || 'Failed to get response');
-      }
-    } catch (error) {
-      console.error('Chatbot error:', error);
-      const errorMessage = {
-        id: Date.now() + 1,
-        text: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment, or contact support directly.",
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsTyping(false);
-    }
+        setMessages((prevMsgs) => [...prevMsgs, errorMessage]);
+      })
+      .finally(() => {
+        setIsTyping(false);
+        isProcessingRef.current = false;
+      });
   };
 
   const quickReplies = [
@@ -108,7 +123,7 @@ const Chatbot = () => {
       {/* Chatbot Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9998] w-12 h-12 sm:w-14 sm:h-14 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center group"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[10000] w-12 h-12 sm:w-14 sm:h-14 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center group"
         aria-label="Open chatbot"
       >
         {isOpen ? (
@@ -147,7 +162,7 @@ const Chatbot = () => {
 
       {/* Chatbot Window */}
       {isOpen && (
-        <div className="fixed bottom-20 right-2 sm:bottom-24 sm:right-6 z-[9997] w-[calc(100vw-1rem)] sm:w-80 md:w-96 h-[500px] max-h-[calc(100vh-6rem)] bg-white dark:bg-slate-800 rounded-lg shadow-2xl flex flex-col border border-slate-200 dark:border-slate-700 animate-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-20 right-2 sm:bottom-24 sm:right-6 z-[10001] w-[calc(100vw-1rem)] sm:w-80 md:w-96 h-[500px] max-h-[calc(100vh-6rem)] bg-white dark:bg-slate-800 rounded-lg shadow-2xl flex flex-col border border-slate-200 dark:border-slate-700 animate-in slide-in-from-bottom-5 duration-300">
           {/* Header */}
           <div className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-4 py-3 rounded-t-lg flex items-center justify-between">
             <div className="flex items-center gap-2">

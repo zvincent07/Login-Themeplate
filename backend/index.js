@@ -19,7 +19,7 @@ if (process.env.SEED_DB === 'true' || config.nodeEnv === 'development') {
     try {
       await seedDatabase();
     } catch (error) {
-      console.error('Seeding failed:', error);
+      // Silently handle seeding errors
     }
   }, 2000);
 }
@@ -50,9 +50,7 @@ app.use(errorHandler);
 
 // Start server
 const PORT = config.port;
-app.listen(PORT, () => {
-  console.log(`Server running in ${config.nodeEnv} mode on port ${PORT}`);
-});
+app.listen(PORT);
 
 module.exports = app;
 

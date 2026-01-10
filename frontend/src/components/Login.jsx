@@ -4,6 +4,7 @@ import authService from '../services/authService';
 import { Input, Button, Label, Checkbox } from './ui';
 import ThemeToggle from './ThemeToggle';
 import Chatbot from './Chatbot';
+import CursorTracker from '../utils/cursorTracker';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,10 +15,7 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState('');
-  const [turnstileError, setTurnstileError] = useState(false);
-  const turnstileRef = useRef(null);
-  const turnstileRendered = useRef(false);
+  const cursorTrackerRef = useRef(null);
 
   const { email, password } = formData;
 
@@ -33,22 +31,22 @@ const Login = () => {
     e.preventDefault();
     setError('');
 
-    // Check if Turnstile token exists (only if Turnstile is enabled)
-    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
-    if (siteKey && siteKey !== 'your-turnstile-site-key' && !turnstileToken) {
-      setError('Please complete the security verification.');
-      return;
+    // Stop cursor tracking and get movement data
+    let movementData = null;
+    if (cursorTrackerRef.current) {
+      cursorTrackerRef.current.stopTracking();
+      movementData = cursorTrackerRef.current.getMovementData();
     }
 
     setLoading(true);
 
     try {
-      const response = await authService.login(email, password, turnstileToken, rememberMe);
-      if (response.success) {
+      const response = await authService.login(email, password, rememberMe, movementData);
+      if (response.success && response.data?.user) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        const role = response.data.user.roleName;
+        const role = response.data.user?.roleName || 'user';
         if (role === 'admin') {
           navigate('/admin/dashboard');
         } else if (role === 'employee') {
@@ -59,72 +57,36 @@ const Login = () => {
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
-      // Reset Turnstile on error
-      if (window.turnstile && turnstileRef.current) {
-        window.turnstile.reset(turnstileRef.current);
-        setTurnstileToken('');
+      // Restart cursor tracking on error
+      if (cursorTrackerRef.current) {
+        cursorTrackerRef.current.startTracking();
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // Check for Google OAuth errors in URL
   useEffect(() => {
-    // Prevent double rendering in StrictMode
-    if (turnstileRendered.current) return;
-    
-    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
-    
-    // Skip if Turnstile is not configured
-    if (!siteKey || siteKey === 'your-turnstile-site-key') {
-      // Auto-enable login if Turnstile is not configured
-      setTurnstileToken('skip-verification');
-      return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthError = urlParams.get('error');
+    if (oauthError) {
+      setError('Google authentication failed. Please try again.');
+      // Clear the error from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
+  }, []);
 
-    // Wait for Turnstile script to load
-    const checkTurnstile = () => {
-      if (window.turnstile && turnstileRef.current && !turnstileRendered.current) {
-        try {
-          turnstileRendered.current = true;
-          window.turnstile.render(turnstileRef.current, {
-            sitekey: siteKey,
-            callback: (token) => {
-              setTurnstileToken(token);
-              setTurnstileError(false);
-            },
-            'error-callback': () => {
-              setTurnstileToken('');
-              setTurnstileError(true);
-            },
-            'expired-callback': () => {
-              setTurnstileToken('');
-            },
-          });
-        } catch (err) {
-          setTurnstileError(true);
-          setTurnstileToken('skip-verification');
-        }
-      } else if (!window.turnstile) {
-        // Retry after a short delay if script hasn't loaded
-        setTimeout(checkTurnstile, 100);
-      }
-    };
+  // Initialize cursor tracking
+  useEffect(() => {
+    // Create cursor tracker instance
+    cursorTrackerRef.current = new CursorTracker();
+    cursorTrackerRef.current.startTracking();
 
-    // Check immediately and also after a delay
-    checkTurnstile();
-    const timeoutId = setTimeout(checkTurnstile, 500);
-
-    // Cleanup function
+    // Cleanup on unmount
     return () => {
-      clearTimeout(timeoutId);
-      if (window.turnstile && turnstileRef.current && turnstileRendered.current) {
-        try {
-          window.turnstile.remove(turnstileRef.current);
-        } catch (err) {
-          // Ignore cleanup errors
-        }
-        turnstileRendered.current = false;
+      if (cursorTrackerRef.current) {
+        cursorTrackerRef.current.stopTracking();
       }
     };
   }, []);
@@ -138,9 +100,9 @@ const Login = () => {
   return (
     <div className="min-h-screen flex relative">
       {/* Theme Toggle - Top Right */}
-      <div className="fixed top-4 right-4 z-[9999]">
-        <ThemeToggle />
-      </div>
+          <div className="fixed top-4 right-4 z-[9999]">
+            <ThemeToggle />
+          </div>
       
       <div className="w-full grid md:grid-cols-2">
         {/* Left Side - Login Form */}
@@ -192,7 +154,7 @@ const Login = () => {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 text-xs">
+                <div className="flex items-center justify-between text-xs">
                   <Checkbox
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
@@ -200,31 +162,15 @@ const Login = () => {
                   />
                   <Link
                     to="/forgot-password"
-                    className="text-black dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
+                    className="text-black dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 text-xs font-medium"
                   >
                     Forgot password?
                   </Link>
                 </div>
 
-                {/* Cloudflare Turnstile */}
-                {import.meta.env.VITE_TURNSTILE_SITE_KEY && 
-                 import.meta.env.VITE_TURNSTILE_SITE_KEY !== 'your-turnstile-site-key' && (
-                  <div className="flex justify-center">
-                    <div ref={turnstileRef}></div>
-                  </div>
-                )}
-
-                {turnstileError && (
-                  <div className="p-2 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/50 rounded-md">
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 text-center">
-                      Security verification failed. You can still try to sign in.
-                    </p>
-                  </div>
-                )}
 
                 <Button
                   type="submit"
-                  disabled={turnstileToken === '' && !turnstileError}
                   loading={loading}
                 >
                   Sign in
@@ -235,10 +181,10 @@ const Login = () => {
               <div className="mt-5">
                 <div className="relative mb-5">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                    <div className="w-full border-t border-gray-300 dark:border-gray-500"></div>
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="px-2 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400">
+                    <span className="px-2 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300">
                       Or continue with
                     </span>
                   </div>
@@ -274,7 +220,7 @@ const Login = () => {
                 </Button>
               </div>
 
-              <div className="mt-6 text-center">
+              <div className="mt-6 mb-6 pb-4 text-center">
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   Don't have an account?{' '}
                   <a

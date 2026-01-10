@@ -15,8 +15,6 @@ module.exports = {
   smtpUser: process.env.SMTP_USER,
   smtpPass: process.env.SMTP_PASS,
   appName: process.env.APP_NAME || 'RBAC Auth',
-  // Cloudflare Turnstile
-  turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
   // AI Chatbot Configuration
   aiProvider: process.env.AI_PROVIDER || 'groq', // Default to Groq (free tier)
   aiApiKey: process.env.AI_API_KEY,

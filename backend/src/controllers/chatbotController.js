@@ -46,7 +46,6 @@ const chatWithBot = asyncHandler(async (req, res) => {
       response: aiResponse,
     });
   } catch (error) {
-    console.error('AI API Error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get AI response. Please try again later.',

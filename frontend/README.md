@@ -8,7 +8,7 @@ React + Vite frontend application for the RBAC Authentication System.
 frontend/
 ├── src/
 │   ├── components/      # React components
-│   │   ├── Login.jsx    # Login page with Turnstile
+│   │   ├── Login.jsx    # Login page with cursor tracking
 │   │   └── Register.jsx # Registration with OTP flow
 │   ├── config/          # Configuration files
 │   │   └── api.js       # API endpoints configuration
@@ -41,7 +41,6 @@ cp .env.example .env
 
 3. Update `.env` with your configuration:
    - `VITE_API_BASE_URL` - Backend API URL (default: http://localhost:5000/api)
-   - `VITE_TURNSTILE_SITE_KEY` - Cloudflare Turnstile site key (optional)
 
 4. Start the development server:
 ```bash
@@ -55,7 +54,7 @@ The frontend will run on `http://localhost:3000`.
 - ✅ Modern, sleek login/register UI
 - ✅ Real-time password strength indicator
 - ✅ OTP verification screen
-- ✅ Cloudflare Turnstile integration
+- ✅ Cursor movement tracking for bot detection
 - ✅ Google OAuth login
 - ✅ Responsive design (mobile-friendly)
 - ✅ Dark mode support
@@ -65,7 +64,7 @@ The frontend will run on `http://localhost:3000`.
 
 ### Login.jsx
 - Email/password authentication
-- Cloudflare Turnstile bot protection
+- Cursor movement-based bot detection
 - Google OAuth integration
 - Remember me checkbox
 - Forgot password link
@@ -79,7 +78,6 @@ The frontend will run on `http://localhost:3000`.
 ## Environment Variables
 
 - `VITE_API_BASE_URL` - Backend API base URL (required)
-- `VITE_TURNSTILE_SITE_KEY` - Cloudflare Turnstile site key (optional)
 
 ## Available Scripts
 

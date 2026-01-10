@@ -33,7 +33,7 @@ backend/
 │       ├── generateToken.js
 │       ├── generateOTP.js
 │       ├── passwordValidator.js
-│       ├── verifyTurnstile.js
+│       ├── unbanIP.js
 │       └── seedDatabase.js
 ├── index.js             # Main entry point
 ├── package.json
@@ -57,7 +57,6 @@ cp .env.example .env
    - JWT secret key
    - Google OAuth credentials (optional)
    - Email SMTP credentials (required for OTP)
-   - Cloudflare Turnstile secret key (optional)
 
 4. Start the development server:
 ```bash
@@ -73,7 +72,7 @@ The server will automatically:
 ### Authentication (`/api/auth`)
 
 - `POST /api/auth/register` - Register new user (sends OTP)
-- `POST /api/auth/login` - Login user (requires verified email, Turnstile verification)
+- `POST /api/auth/login` - Login user (requires verified email, cursor movement tracking for bot detection)
 - `POST /api/auth/verify-otp` - Verify OTP and activate account
 - `POST /api/auth/resend-otp` - Resend OTP code
 - `GET /api/auth/me` - Get current user (protected)
@@ -103,7 +102,6 @@ See `.env.example` for all available variables:
 **Optional:**
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
-- `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret key
 - `ADMIN_EMAIL` - First admin email (default: admin@example.com)
 - `ADMIN_PASSWORD` - First admin password (default: Admin123!)
 - `SEED_DB` - Enable database seeding (default: true)
@@ -113,7 +111,7 @@ See `.env.example` for all available variables:
 - Password hashing with bcrypt
 - JWT token authentication
 - Email OTP verification
-- Cloudflare Turnstile bot protection
+- Cursor movement-based bot detection with IP banning
 - Role-based access control (RBAC)
 - Protected routes with middleware
 

@@ -27,8 +27,9 @@ const apiRequest = async (endpoint, options = {}) => {
       if (response.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // Redirect to login if not already there
-        if (!window.location.pathname.includes('/login')) {
+        // Redirect to login if not already there (exact match to avoid false positives)
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/login' && !currentPath.startsWith('/login?')) {
           window.location.href = '/login';
         }
       }
@@ -41,7 +42,6 @@ const apiRequest = async (endpoint, options = {}) => {
 
     return await response.json();
   } catch (error) {
-    console.error('API request error:', error);
     throw error;
   }
 };

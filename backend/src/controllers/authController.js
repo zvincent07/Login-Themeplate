@@ -5,7 +5,6 @@ const { generateToken, generateResetToken } = require('../utils/generateToken');
 const validatePasswordStrength = require('../utils/passwordValidator');
 const { generateOTP, getOTPExpiry } = require('../utils/generateOTP');
 const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService');
-const verifyTurnstile = require('../utils/verifyTurnstile');
 const config = require('../config');
 const crypto = require('crypto');
 
@@ -159,7 +158,7 @@ exports.verifyOTP = asyncHandler(async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roleName: user.roleName,
+        roleName: user.roleName || 'user',
         isEmailVerified: true,
       },
     },
@@ -226,7 +225,7 @@ exports.resendOTP = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
-  const { email, password, turnstileToken, rememberMe } = req.body;
+  const { email, password, rememberMe } = req.body;
 
   // Validate email & password
   if (!email || !password) {
@@ -236,32 +235,34 @@ exports.login = asyncHandler(async (req, res) => {
     });
   }
 
-  // Verify Turnstile token (skip if token is 'skip-verification' or not configured)
-  if (config.turnstileSecretKey && 
-      turnstileToken && 
-      turnstileToken !== 'skip-verification') {
-    try {
-      const isValid = await verifyTurnstile(
-        turnstileToken,
-        config.turnstileSecretKey,
-        req.ip || req.connection.remoteAddress
-      );
-
-      if (!isValid) {
-        return res.status(400).json({
-          success: false,
-          error: 'Security verification failed. Please try again.',
-        });
-      }
-    } catch (error) {
-      // Allow login to proceed if verification fails (graceful degradation)
-    }
-  }
+  // Note: Bot detection is handled by botDetection middleware
+  // Movement data is analyzed there and IP is banned if bot-like behavior is detected
 
   // Check for user (include password field)
-  const user = await User.findOne({ email }).select('+password').populate('role');
+  // Populate role, but handle if role doesn't exist
+  const user = await User.findOne({ email }).select('+password').populate({
+    path: 'role',
+    select: 'name',
+  });
 
-  if (!user || !(await user.matchPassword(password))) {
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid credentials',
+    });
+  }
+
+  // Check if user has a password (not social login)
+  if (!user.password) {
+    return res.status(401).json({
+      success: false,
+      error: 'This account uses social login. Please use Google to sign in.',
+    });
+  }
+
+  // Verify password
+  const isPasswordValid = await user.matchPassword(password);
+  if (!isPasswordValid) {
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials',
@@ -291,7 +292,18 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Generate token with extended expiration if "remember me" is checked
   const tokenExpiration = rememberMe ? '30d' : config.jwtExpire;
-  const token = generateToken(user._id, tokenExpiration);
+  let token;
+  try {
+    token = generateToken(user._id, tokenExpiration);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to generate authentication token. Please try again.',
+    });
+  }
+
+  // Safely get roleName - handle case where role might not be populated
+  const roleName = user.roleName || (user.role?.name) || 'user';
 
   res.status(200).json({
     success: true,
@@ -302,7 +314,7 @@ exports.login = asyncHandler(async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roleName: user.roleName,
+        roleName: roleName,
         avatar: user.avatar,
       },
     },
@@ -315,6 +327,16 @@ exports.login = asyncHandler(async (req, res) => {
 exports.getMe = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).populate('role');
 
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'User not found',
+    });
+  }
+
+  // Safely get roleName - handle case where role might not be populated
+  const roleName = user.roleName || (user.role?.name) || 'user';
+
   res.status(200).json({
     success: true,
     data: {
@@ -323,7 +345,7 @@ exports.getMe = asyncHandler(async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roleName: user.roleName,
+        roleName: roleName,
         avatar: user.avatar,
         isEmailVerified: user.isEmailVerified,
       },
@@ -486,7 +508,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roleName: user.roleName,
+        roleName: user.roleName || 'user',
       },
     },
   });

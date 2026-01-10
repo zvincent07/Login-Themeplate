@@ -65,9 +65,6 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     }
     )
   );
-} else {
-  console.log('⚠️  Google OAuth not configured. Google login will be disabled.');
-  console.log('   To enable: Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env');
 }
 
 passport.serializeUser((user, done) => {

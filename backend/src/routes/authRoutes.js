@@ -13,15 +13,18 @@ const {
   resetPassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
+const { optionalAuth } = require('../middleware/optionalAuth');
+const botDetection = require('../middleware/botDetection');
 
-// Public routes
-router.post('/register', register);
-router.post('/login', login);
+// Public routes (with bot detection)
+router.post('/register', botDetection, register);
+router.post('/login', botDetection, login);
 router.post('/verify-otp', verifyOTP);
 router.post('/resend-otp', resendOTP);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
-router.post('/logout', protect, logout);
+// Logout works even with expired tokens
+router.post('/logout', optionalAuth, logout);
 
 // Google OAuth routes (only if configured)
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {

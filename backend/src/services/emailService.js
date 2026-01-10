@@ -63,7 +63,6 @@ const sendOTPEmail = async (email, otpCode, firstName = 'User') => {
     await transporter.sendMail(mailOptions);
     return { success: true };
   } catch (error) {
-    console.error('Error sending OTP email:', error);
     throw new Error('Failed to send OTP email. Please try again later.');
   }
 };
@@ -120,7 +119,6 @@ const sendPasswordResetEmail = async (email, resetUrl, firstName = 'User') => {
     await transporter.sendMail(mailOptions);
     return { success: true };
   } catch (error) {
-    console.error('Error sending password reset email:', error);
     throw new Error('Failed to send password reset email. Please try again later.');
   }
 };

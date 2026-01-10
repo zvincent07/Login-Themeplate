@@ -28,7 +28,7 @@ const Input = ({
   maxLength,
   ...rest
 }) => {
-  const baseClasses = 'w-full px-3 py-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:border-slate-500 dark:focus:border-slate-400 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all';
+  const baseClasses = 'w-full px-3 py-2.5 text-sm border border-slate-300 dark:border-slate-600 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:border-slate-500 dark:focus:border-slate-500 bg-white dark:bg-slate-800/90 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all';
   
   const combinedClasses = `${baseClasses} ${className}`.trim();
 
