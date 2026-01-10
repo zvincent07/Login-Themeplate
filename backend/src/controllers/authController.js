@@ -64,9 +64,9 @@ exports.register = asyncHandler(async (req, res) => {
     },
   });
 
-  // Send OTP email
+  // Send OTP email (include userId for verification link)
   try {
-    await sendOTPEmail(email, otpCode, firstName);
+    await sendOTPEmail(email, otpCode, firstName, null, user._id.toString());
   } catch (error) {
     // If email fails, delete the user and return error
     await User.findByIdAndDelete(user._id);
@@ -205,9 +205,9 @@ exports.resendOTP = asyncHandler(async (req, res) => {
   };
   await user.save();
 
-  // Send OTP email
+  // Send OTP email (include userId for verification link)
   try {
-    await sendOTPEmail(user.email, otpCode, user.firstName);
+    await sendOTPEmail(user.email, otpCode, user.firstName, null, user._id.toString());
   } catch (error) {
     return res.status(500).json({
       success: false,

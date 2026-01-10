@@ -4,6 +4,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import VerifyOTP from './components/VerifyOTP';
 import AutoLogout from './components/AutoLogout';
 import NotFound from './components/NotFound';
 import UserDashboard from './components/dashboards/UserDashboard';
@@ -71,7 +72,27 @@ function App() {
       path === '/auth/logout' || 
       path === '/forgot-password' || 
       path.startsWith('/reset-password') ||
+      path.startsWith('/verify-otp') ||
       path === '/'; // Root path
+
+    // Define valid routes (excluding catch-all)
+    const validRoutes = [
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/auth/logout',
+      '/dashboard',
+      '/admin',
+      '/employee/dashboard',
+      '/'
+    ];
+    
+    // Check if path matches a valid route (or is a sub-route of valid routes)
+    const isValidRoute = validRoutes.some(route => {
+      if (route === '/') return path === '/';
+      if (route === '/admin') return path.startsWith('/admin');
+      return path === route || path.startsWith(route + '/');
+    });
 
     // Don't redirect if on public routes
     if (isPublicRoute) {
@@ -81,18 +102,42 @@ function App() {
     // Check if user is already logged in
     const storedUser = authService.getStoredUser();
     if (storedUser) {
-      // Redirect based on role, but only if not already on the correct route
       const role = storedUser.roleName || 'user';
+      
+      // Allow admin to access any /admin/* route
+      if (role === 'admin' && path.startsWith('/admin')) {
+        return;
+      }
+      
+      // Allow employee to access /employee/dashboard
+      if (role === 'employee' && path.startsWith('/employee')) {
+        return;
+      }
+      
+      // Allow user to access /dashboard
+      if (role === 'user' && path === '/dashboard') {
+        return;
+      }
+      
+      // If on an invalid route (404), let NotFound component handle it
+      if (!isValidRoute) {
+        return;
+      }
+      
+      // Redirect based on role if not on correct route
       const targetRoute = role === 'admin' 
         ? '/admin/dashboard' 
         : role === 'employee' 
         ? '/employee/dashboard' 
         : '/dashboard';
       
-      // Only navigate if not already on the target route
-      if (path !== targetRoute) {
-        navigate(targetRoute, { replace: true });
-      }
+      navigate(targetRoute, { replace: true });
+      return;
+    }
+
+    // If not logged in and on an invalid route (404), let NotFound component handle it
+    // Don't redirect to login - let the 404 page show with option to go to login
+    if (!storedUser && !isValidRoute) {
       return;
     }
 
@@ -107,11 +152,12 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/logout" element={<AutoLogout />} />
       <Route path="/dashboard" element={<UserDashboard />} />
-      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/admin/*" element={<AdminDashboard />} />
       <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
       <Route path="/" element={<Login />} />
       {/* Catch-all route for 404 */}

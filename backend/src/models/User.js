@@ -80,6 +80,10 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

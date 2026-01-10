@@ -7,18 +7,20 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*; default-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://api.groq.com https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';">
     <title>frontend</title>
     <script>
-      // Initialize theme before React loads to prevent flash
+      // Initialize theme IMMEDIATELY before React loads to prevent flash
+      // This must run synchronously before any styles are applied
       (function() {
         try {
           const savedTheme = localStorage.getItem('theme');
           const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
           const shouldBeDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
           
-          // Always start fresh - remove dark class first
-          document.documentElement.classList.remove('dark');
-          
+          // Set dark class immediately, before any rendering
+          // This ensures Tailwind dark: variants work from the start
           if (shouldBeDark) {
             document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
           }
         } catch (e) {
           // Silently handle theme initialization errors
