@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import authService from '../services/authService';
 import { Input, Button, Label, Checkbox } from './ui';
 import ThemeToggle from './ThemeToggle';
+import Chatbot from './Chatbot';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -329,6 +330,9 @@ const Login = () => {
           </div>
         </div>
       </div>
+
+      {/* Chatbot */}
+      <Chatbot />
     </div>
   );
 };

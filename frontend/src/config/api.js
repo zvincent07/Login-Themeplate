@@ -5,6 +5,7 @@ export const API_ENDPOINTS = {
   health: '/health',
   auth: '/auth',
   users: '/users',
+  chatbot: '/chatbot',
 };
 
 export default API_BASE_URL;

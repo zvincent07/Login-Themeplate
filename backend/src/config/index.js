@@ -17,5 +17,11 @@ module.exports = {
   appName: process.env.APP_NAME || 'RBAC Auth',
   // Cloudflare Turnstile
   turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
+  // AI Chatbot Configuration
+  aiProvider: process.env.AI_PROVIDER || 'groq', // Default to Groq (free tier)
+  aiApiKey: process.env.AI_API_KEY,
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+  anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307',
+  groqModel: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
 };
 

@@ -322,11 +322,141 @@ TURNSTILE_SECRET_KEY=your-secret-key-here
 
 ---
 
+## AI Chatbot Setup
+
+The application includes an AI-powered chatbot on the login page. You can configure it to use Groq (FREE), OpenAI, or Anthropic Claude.
+
+### Option 1: Groq (FREE - Recommended for Free Tier) ⭐
+
+Groq offers a **generous free tier** with fast responses using open-source models like Llama 3.1.
+
+#### Step 1: Get Groq API Key
+
+1. Go to [Groq Console](https://console.groq.com/)
+2. Sign up for a free account (no credit card required)
+3. Navigate to **"API Keys"** → **"Create API Key"**
+4. Copy the API key
+
+**Note**: Groq offers free API access with generous rate limits - perfect for development and small-scale production!
+
+#### Step 2: Add to Backend .env
+
+Add to `backend/.env`:
+
+```env
+AI_PROVIDER=groq
+AI_API_KEY=gsk_your-groq-api-key-here
+GROQ_MODEL=llama-3.1-8b-instant
+```
+
+**Available Models**:
+- `llama-3.1-8b-instant` (default, fastest, free tier)
+- `llama-3.1-70b-versatile` (more capable, still free)
+- `mixtral-8x7b-32768` (good balance)
+- `gemma-7b-it` (Google's Gemma model)
+
+#### Step 3: Test Chatbot
+
+1. Restart backend server
+2. Go to login page
+3. Click the chatbot icon in the bottom-right corner
+4. Send a message and verify AI responses
+
+**✅ Groq Chatbot is now configured!**
+
+### Option 2: OpenAI (Paid)
+
+#### Step 1: Get OpenAI API Key
+
+1. Go to [OpenAI Platform](https://platform.openai.com/)
+2. Sign up or log in
+3. Navigate to **"API Keys"** → **"Create new secret key"**
+4. Copy the API key (you won't be able to see it again)
+
+#### Step 2: Add to Backend .env
+
+Add to `backend/.env`:
+
+```env
+AI_PROVIDER=openai
+AI_API_KEY=sk-your-openai-api-key-here
+OPENAI_MODEL=gpt-3.5-turbo
+```
+
+**Available Models**:
+- `gpt-3.5-turbo` (default, cost-effective)
+- `gpt-4` (more capable, higher cost)
+- `gpt-4-turbo` (latest, best performance)
+
+#### Step 3: Test Chatbot
+
+1. Restart backend server
+2. Go to login page
+3. Click the chatbot icon in the bottom-right corner
+4. Send a message and verify AI responses
+
+**✅ OpenAI Chatbot is now configured!**
+
+### Option 2: Anthropic Claude
+
+#### Step 1: Get Anthropic API Key
+
+1. Go to [Anthropic Console](https://console.anthropic.com/)
+2. Sign up or log in
+3. Navigate to **"API Keys"** → **"Create Key"**
+4. Copy the API key
+
+#### Step 2: Add to Backend .env
+
+Add to `backend/.env`:
+
+```env
+AI_PROVIDER=anthropic
+AI_API_KEY=sk-ant-your-anthropic-api-key-here
+ANTHROPIC_MODEL=claude-3-haiku-20240307
+```
+
+**Available Models**:
+- `claude-3-haiku-20240307` (default, fastest, cost-effective)
+- `claude-3-sonnet-20240229` (balanced)
+- `claude-3-opus-20240229` (most capable)
+
+#### Step 3: Test Chatbot
+
+1. Restart backend server
+2. Go to login page
+3. Click the chatbot icon in the bottom-right corner
+4. Send a message and verify AI responses
+
+**✅ Anthropic Chatbot is now configured!**
+
+### Cost Comparison
+
+| Provider | Cost | Free Tier | Speed | Best For |
+|----------|------|-----------|-------|----------|
+| **Groq** | FREE ⭐ | Generous limits | Very Fast | Development, small projects |
+| **OpenAI** | Paid | Limited credits | Fast | Production, best quality |
+| **Anthropic** | Paid | Limited credits | Medium | Complex reasoning |
+
+**Recommendation**: Start with **Groq** (free) for development, then switch to OpenAI/Anthropic for production if needed.
+
+### Fallback Behavior
+
+If AI API keys are not configured, the chatbot will:
+- Still be visible and functional
+- Return helpful fallback responses
+- Display a message about configuration needed
+
+**Note**: The chatbot works without authentication, making it accessible to all users for support.
+
+---
+
 ## Summary
 
 ✅ **Google OAuth**: Configured in Google Cloud Console → Add credentials to `.env`  
 ✅ **Email OTP**: Generate Gmail App Password → Add to `.env`  
 ✅ **Cloudflare Turnstile**: Get keys from Cloudflare Dashboard → Add to `.env`  
+✅ **AI Chatbot**: Get API key from Groq (FREE)/OpenAI/Anthropic → Add to `.env`  
 ✅ **All features**: Restart backend server → Test registration/login
 
 For detailed API documentation, see `README.md`.

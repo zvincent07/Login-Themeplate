@@ -61,7 +61,8 @@ const userSchema = new mongoose.Schema(
     // OAuth fields
     googleId: {
       type: String,
-      sparse: true, // Allows multiple nulls but enforces uniqueness when present
+      sparse: true, // Allows multiple nulls, creates sparse index automatically
+      unique: true, // Enforces uniqueness when value is present
     },
     provider: {
       type: String,
@@ -87,8 +88,7 @@ const userSchema = new mongoose.Schema(
 
 // Indexes
 // Note: email index is automatically created by unique: true
-// googleId index (sparse for OAuth users)
-userSchema.index({ googleId: 1 }, { sparse: true });
+// Note: googleId index is automatically created by unique: true + sparse: true
 userSchema.index({ roleName: 1 });
 
 // Hash password before saving
