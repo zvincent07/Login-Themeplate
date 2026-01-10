@@ -373,13 +373,14 @@ const Users = () => {
     }
   };
 
-  // Export to CSV
-  const handleExportCSV = async (usersToExport = null) => {
+  // Export to CSV - memoized
+  const handleExportCSV = useCallback(async (usersToExport = null) => {
     try {
       let users = usersToExport;
       
       // If no users provided, fetch all users matching current filters
       if (!users) {
+        // Fetch with a high limit to get all users (or use multiple requests if needed)
         const response = await userService.getUsers(1, 10000, {
           search: searchTerm,
           role: roleFilter,
@@ -389,14 +390,24 @@ const Users = () => {
           sortOrder: sortOrder,
         });
         
-        if (response.success && response.data) {
-          users = response.data.users || response.data || [];
+        if (response && response.success) {
+          // response.data is directly the array of users (same as fetchUsers)
+          users = Array.isArray(response.data) ? response.data : [];
+          
+          // If we got the max limit, warn user that there might be more users
+          if (users.length === 10000 && response.pagination && response.pagination.total > 10000) {
+            setToast({
+              message: `Exported first 10,000 users. Total users: ${response.pagination.total}. Consider using filters to export specific users.`,
+              type: 'info',
+            });
+          }
         } else {
-          throw new Error('Failed to fetch users for export');
+          const errorMsg = response?.error || 'Failed to fetch users for export';
+          throw new Error(errorMsg);
         }
       }
       
-      if (users && users.length > 0) {
+      if (users && Array.isArray(users) && users.length > 0) {
         // Create CSV headers
         const headers = ['Email', 'First Name', 'Last Name', 'Role', 'Status', 'Email Verified', 'Provider', 'Created At'];
         
@@ -427,17 +438,31 @@ const Users = () => {
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        
+        // Clean up: remove link and revoke URL
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
 
         setToast({
           message: `Exported ${users.length} user${users.length !== 1 ? 's' : ''} to CSV`,
           type: 'success',
         });
+      } else {
+        setToast({
+          message: 'No users to export',
+          type: 'info',
+        });
       }
     } catch (err) {
       setError(err.message || 'Failed to export users');
+      setToast({
+        message: err.message || 'Failed to export users',
+        type: 'error',
+      });
     }
-  };
+  }, [searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
 
   // Handle checkbox selection
   const handleSelectUser = (userId, user) => {
@@ -585,7 +610,18 @@ const Users = () => {
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handleExportCSV}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleExportCSV().catch(err => {
+                setError(err.message || 'Failed to export users');
+                setToast({
+                  message: err.message || 'Failed to export users',
+                  type: 'error',
+                });
+              });
+            }}
             className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5"
             title="Export to CSV"
           >
