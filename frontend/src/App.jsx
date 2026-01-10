@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -6,9 +6,9 @@ import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import AutoLogout from './components/AutoLogout';
 import NotFound from './components/NotFound';
-import Dashboard from './components/Dashboard';
-import AdminDashboard from './components/AdminDashboard';
-import EmployeeDashboard from './components/EmployeeDashboard';
+import UserDashboard from './components/dashboards/UserDashboard';
+import AdminDashboard from './components/dashboards/AdminDashboard';
+import EmployeeDashboard from './components/dashboards/EmployeeDashboard';
 import authService from './services/authService';
 
 function App() {
@@ -110,7 +110,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/logout" element={<AutoLogout />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/dashboard" element={<UserDashboard />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
       <Route path="/" element={<Login />} />
