@@ -305,6 +305,84 @@ exports.login = asyncHandler(async (req, res) => {
   // Safely get roleName - handle case where role might not be populated
   const roleName = user.roleName || (user.role?.name) || 'user';
 
+  // Create session record (async, don't wait)
+  const Session = require('../models/Session');
+  const { getIPGeolocation, parseUserAgent } = require('../utils/ipGeolocation');
+  
+  const ip =
+    req.ip ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.headers['x-real-ip'] ||
+    'unknown';
+  
+  const userAgent = req.headers['user-agent'] || '';
+  const { platform, browser, device } = parseUserAgent(userAgent);
+  
+  // Session capping: Limit to 20 active sessions per user
+  // Delete oldest sessions if limit exceeded (async, don't block)
+  Session.countDocuments({ user: user._id, isActive: true })
+    .then((sessionCount) => {
+      const MAX_SESSIONS = 20;
+      if (sessionCount >= MAX_SESSIONS) {
+        // Delete oldest sessions to make room
+        return Session.find({ user: user._id, isActive: true })
+          .sort({ lastActive: 1 })
+          .limit(sessionCount - MAX_SESSIONS + 1)
+          .then((oldSessions) => {
+            const idsToDelete = oldSessions.map(s => s._id);
+            return Session.updateMany(
+              { _id: { $in: idsToDelete } },
+              { $set: { isActive: false } }
+            );
+          });
+      }
+    })
+    .catch((err) => {
+      // Silently fail - session capping is not critical
+    });
+  
+  // Create session asynchronously (don't block login response)
+  getIPGeolocation(ip)
+    .then((location) => {
+      Session.create({
+        user: user._id,
+        token,
+        ipAddress: ip,
+        userAgent,
+        platform,
+        browser,
+        device,
+        location: {
+          ...location,
+          ipAddress: ip, // Store IP in location object too for easy access
+        },
+        expiresAt: new Date(Date.now() + (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000),
+        isActive: true,
+      }).catch((err) => {
+        // Silently fail - session tracking is not critical
+        console.error('Session creation error:', err);
+      });
+    })
+    .catch((err) => {
+      // If geolocation fails, still create session with IP but no location
+      Session.create({
+        user: user._id,
+        token,
+        ipAddress: ip,
+        userAgent,
+        platform,
+        browser,
+        device,
+        expiresAt: new Date(Date.now() + (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000),
+        isActive: true,
+      }).catch((err) => {
+        // Silently fail - session tracking is not critical
+        console.error('Session creation error:', err);
+      });
+    });
+
   res.status(200).json({
     success: true,
     token,
@@ -370,6 +448,84 @@ exports.googleCallback = asyncHandler(async (req, res) => {
   // Update last login
   req.user.lastLogin = new Date();
   await req.user.save({ validateBeforeSave: false });
+
+  // Create session record (async, don't wait)
+  const Session = require('../models/Session');
+  const { getIPGeolocation, parseUserAgent } = require('../utils/ipGeolocation');
+  
+  const ip =
+    req.ip ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.headers['x-real-ip'] ||
+    'unknown';
+  
+  const userAgent = req.headers['user-agent'] || '';
+  const { platform, browser, device } = parseUserAgent(userAgent);
+  
+  // Session capping: Limit to 20 active sessions per user
+  // Delete oldest sessions if limit exceeded (async, don't block)
+  Session.countDocuments({ user: req.user._id, isActive: true })
+    .then((sessionCount) => {
+      const MAX_SESSIONS = 20;
+      if (sessionCount >= MAX_SESSIONS) {
+        // Delete oldest sessions to make room
+        return Session.find({ user: req.user._id, isActive: true })
+          .sort({ lastActive: 1 })
+          .limit(sessionCount - MAX_SESSIONS + 1)
+          .then((oldSessions) => {
+            const idsToDelete = oldSessions.map(s => s._id);
+            return Session.updateMany(
+              { _id: { $in: idsToDelete } },
+              { $set: { isActive: false } }
+            );
+          });
+      }
+    })
+    .catch((err) => {
+      // Silently fail - session capping is not critical
+    });
+  
+  // Create session asynchronously (don't block redirect)
+  getIPGeolocation(ip)
+    .then((location) => {
+      Session.create({
+        user: req.user._id,
+        token,
+        ipAddress: ip,
+        userAgent,
+        platform,
+        browser,
+        device,
+        location: {
+          ...location,
+          ipAddress: ip, // Store IP in location object too for easy access
+        },
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days default
+        isActive: true,
+      }).catch((err) => {
+        // Silently fail - session tracking is not critical
+        console.error('Session creation error:', err);
+      });
+    })
+    .catch((err) => {
+      // If geolocation fails, still create session with IP but no location
+      Session.create({
+        user: req.user._id,
+        token,
+        ipAddress: ip,
+        userAgent,
+        platform,
+        browser,
+        device,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days default
+        isActive: true,
+      }).catch((err) => {
+        // Silently fail - session tracking is not critical
+        console.error('Session creation error:', err);
+      });
+    });
 
   // Redirect to frontend with token in query parameter
   // Frontend will extract token and store it
@@ -493,6 +649,15 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   user.password = password;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpire = undefined;
+  
+  // If email is not verified, verify it now (clicking reset link proves email ownership)
+  // This handles the case where admin created account but user forgot to verify email
+  const wasUnverified = !user.isEmailVerified;
+  if (wasUnverified) {
+    user.isEmailVerified = true;
+    user.otp = undefined; // Clear any pending OTP
+  }
+  
   await user.save();
 
   // Generate token for automatic login
@@ -500,7 +665,9 @@ exports.resetPassword = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Password reset successfully',
+    message: wasUnverified 
+      ? 'Password reset successfully. Your email has been verified.' 
+      : 'Password reset successfully',
     token: authToken,
     data: {
       user: {
@@ -509,6 +676,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         roleName: user.roleName || 'user',
+        isEmailVerified: user.isEmailVerified,
       },
     },
   });

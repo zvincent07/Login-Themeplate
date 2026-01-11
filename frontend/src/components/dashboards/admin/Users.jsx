@@ -1,105 +1,65 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import userService from '../../../services/userService';
+import authService from '../../../services/authService';
 import Toast from '../../ui/Toast';
 import UserStats from './UserStats';
 import UserFilters from './UserFilters';
-import { SEARCH_DEBOUNCE_MS, MAX_EXPORT_LIMIT } from '../../../constants';
+import UserSessions from './UserSessions';
+import { MAX_EXPORT_LIMIT } from '../../../constants';
+import { useUserFilters, useUserManagement, useUserSessions } from '../../../hooks';
+
+/**
+ * OPTIMISTIC UI PATTERN (for future updates):
+ * 
+ * When implementing new update operations, follow this pattern for instant UI feedback:
+ * 
+ * 1. Save current state for rollback:
+ *    const previousState = [...currentState];
+ * 
+ * 2. Update UI immediately:
+ *    setCurrentState(prev => /* optimistic update *\/);
+ * 
+ * 3. Make API call:
+ *    const response = await apiCall();
+ * 
+ * 4. On success: Refresh to sync with server (optional, for data consistency)
+ *    if (response.success) {
+ *      fetchData(); // Sync with server
+ *      setToast({ message: 'Success!', type: 'success' });
+ *    }
+ * 
+ * 5. On failure: Rollback optimistic update
+ *    else {
+ *      setCurrentState(previousState); // Rollback
+ *      setToast({ message: 'Failed', type: 'error' });
+ *    }
+ * 
+ * Benefits:
+ * - Instant UI feedback (feels faster)
+ * - Automatic rollback on errors
+ * - Better user experience
+ * 
+ * Example implementations in this file:
+ * - handleToggleActive: Toggle user active/inactive
+ * - handleSubmitEdit: Edit user details
+ * - handleSubmitDelete: Delete user
+ * - handleTerminateSession: Terminate user session
+ * - handleTerminateAllOthers: Terminate all other sessions
+ * - confirmBulkDelete: Bulk delete users
+ * - handleRestore: Restore deleted user
+ */
 
 const Users = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [providerFilter, setProviderFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [viewUserDetails, setViewUserDetails] = useState(null);
-  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
-  const [bulkDeleteProgress, setBulkDeleteProgress] = useState({ current: 0, total: 0 });
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    firstName: '',
-    lastName: '',
-    roleName: 'user',
-    isActive: true,
-    isEmailVerified: false,
-  });
-  const [copiedUserId, setCopiedUserId] = useState(false);
-  const [formErrors, setFormErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [openDropdown, setOpenDropdown] = useState(null); // Track which user's dropdown is open
-  const [dropdownPosition, setDropdownPosition] = useState({}); // Track dropdown positions (top/bottom)
-  const [selectedUsers, setSelectedUsers] = useState([]); // Track selected users for bulk actions
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const itemsPerPage = 10;
-  
-  // Stats state
+  // Custom hooks for data management
+  const filters = useUserFilters();
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     unverified: 0,
   });
-
-  // AbortController ref for canceling in-flight requests
-  const abortControllerRef = useRef(null);
-
-  // Fetch users with pagination and filters (server-side filtering)
-  const fetchUsers = useCallback(async (page = 1, signal = null) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await userService.getUsers(page, itemsPerPage, {
-        search: searchTerm,
-        role: roleFilter,
-        status: statusFilter,
-        provider: providerFilter,
-        sortBy: sortBy,
-        sortOrder: sortOrder,
-      });
-      
-      // Check if request was aborted
-      if (signal?.aborted) {
-        return;
-      }
-      
-      if (response.success) {
-        setUsers(response.data || []);
-        if (response.pagination) {
-          setTotalPages(response.pagination.pages || 1);
-          setTotalUsers(response.pagination.total || 0);
-        }
-      } else {
-        setError(response.error || 'Failed to fetch users');
-      }
-    } catch (err) {
-      // Don't set error if request was aborted
-      if (signal?.aborted) {
-        return;
-      }
-      setError(err.message || 'Failed to fetch users');
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [itemsPerPage, searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
-
-  // Fetch stats
+  const [currentUserId, setCurrentUserId] = useState(null);
+  
+  // Fetch stats - must be defined before useUserManagement hook
   const fetchStats = useCallback(async () => {
     try {
       const response = await userService.getUserStats();
@@ -110,48 +70,120 @@ const Users = () => {
       console.error('Failed to fetch stats:', err);
     }
   }, []);
+  
+  const management = useUserManagement(
+    currentUserId,
+    filters.users,
+    filters.setUsers,
+    stats,
+    setStats,
+    fetchStats
+  );
+  
+  const sessions = useUserSessions();
 
-  // Fetch users when page or filters change (with debounce for search)
-  useEffect(() => {
-    // Cancel previous request if it exists
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    
-    // Create new AbortController for this request
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    
-    const timeoutId = setTimeout(() => {
-      fetchUsers(currentPage, abortController.signal);
-    }, searchTerm ? SEARCH_DEBOUNCE_MS : 0);
-
-    return () => {
-      clearTimeout(timeoutId);
-      // Abort request on cleanup
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [currentPage, fetchUsers, searchTerm]);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
+  // UI state (modals, dropdowns, etc.)
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [activeViewTab, setActiveViewTab] = useState('details'); // 'details' or 'sessions'
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [viewUserDetails, setViewUserDetails] = useState(null);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+  const [bulkDeleteProgress, setBulkDeleteProgress] = useState({ current: 0, total: 0 });
+  const [copiedUserId, setCopiedUserId] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [openDropdown, setOpenDropdown] = useState(null); // Track which user's dropdown is open
+  const [dropdownPosition, setDropdownPosition] = useState({}); // Track dropdown positions (top/bottom)
+  const [selectedUsers, setSelectedUsers] = useState([]); // Track selected users for bulk actions
 
   // Clear selection when filters change (to prevent selecting users from different filter sets)
   useEffect(() => {
     setSelectedUsers([]);
-  }, [searchTerm, roleFilter, statusFilter, providerFilter]);
+  }, [filters.searchTerm, filters.roleFilter, filters.statusFilter, filters.providerFilter]);
 
   // Fetch stats on component mount and after user operations
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  // Use users directly (no client-side filtering needed) - memoized to prevent unnecessary recalculations
-  const filteredUsers = useMemo(() => users, [users]);
+  // Fetch current user ID on component mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await authService.getMe();
+        if (response.success && response.data) {
+          setCurrentUserId(response.data.id || response.data._id);
+        }
+      } catch {
+        // Silently fail - not critical if we can't get current user
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Prevent modals from opening for current user - runs immediately when modal state changes
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    // Check edit modal - close immediately if opened for current user
+    if (showEditModal && selectedUser) {
+      const selectedUserId = selectedUser._id || selectedUser.id;
+      const isCurrentUser = selectedUserId && (selectedUserId === currentUserId || selectedUserId.toString() === currentUserId.toString());
+      
+      if (isCurrentUser) {
+        setShowEditModal(false);
+        setSelectedUser(null);
+        setToast({
+          message: 'You cannot edit your own account.',
+          type: 'error',
+        });
+        return; // Exit early to prevent further checks
+      }
+    }
+    
+    // Check delete modal - close immediately if opened for current user
+    if (showDeleteModal && selectedUser) {
+      const selectedUserId = selectedUser._id || selectedUser.id;
+      const isCurrentUser = selectedUserId && (selectedUserId === currentUserId || selectedUserId.toString() === currentUserId.toString());
+      
+      if (isCurrentUser) {
+        setShowDeleteModal(false);
+        setSelectedUser(null);
+        setToast({
+          message: 'You cannot delete your own account.',
+          type: 'error',
+        });
+      }
+    }
+  }, [currentUserId, selectedUser, showEditModal, showDeleteModal]);
+
+  // Use filteredUsers from hook
+  const filteredUsers = filters.filteredUsers;
+
+  // Compute whether edit modal should be shown - prevents rendering if editing own account
+  const shouldShowEditModal = useMemo(() => {
+    if (!showEditModal || !selectedUser) return false;
+    // If currentUserId is not loaded yet, allow modal to show (will be closed by useEffect if needed)
+    if (!currentUserId) return true;
+    const editingUserId = selectedUser._id || selectedUser.id;
+    if (!editingUserId) return true;
+    const isCurrentUser = editingUserId === currentUserId || editingUserId.toString() === currentUserId.toString();
+    return !isCurrentUser; // Only return false if it's the current user
+  }, [showEditModal, selectedUser, currentUserId]);
+
+  // Compute whether delete modal should be shown - prevents rendering if deleting own account
+  const shouldShowDeleteModal = useMemo(() => {
+    if (!showDeleteModal || !selectedUser) return false;
+    // If currentUserId is not loaded yet, allow modal to show (will be closed by useEffect if needed)
+    if (!currentUserId) return true;
+    const deletingUserId = selectedUser._id || selectedUser.id;
+    if (!deletingUserId) return true;
+    const isCurrentUser = deletingUserId === currentUserId || deletingUserId.toString() === currentUserId.toString();
+    return !isCurrentUser; // Only return false if it's the current user
+  }, [showDeleteModal, selectedUser, currentUserId]);
 
   // Memoize selection state calculations
   const allSelected = useMemo(() => {
@@ -162,40 +194,61 @@ const Users = () => {
 
   // Handle create user
   const handleCreate = () => {
-    setFormData({
+    management.setFormData({
       email: '',
       password: '',
       firstName: '',
       lastName: '',
       roleName: 'user',
       isActive: true,
+      isEmailVerified: false,
     });
-    setFormErrors({});
-    setShowPassword(false);
+    management.setFormErrors({});
+    management.setShowPassword(false);
     setShowCreateModal(true);
   };
 
   // Handle edit user
   const handleEdit = (user) => {
+    // Prevent editing own account
+    if (management.isOwnAccount(user._id || user.id)) {
+      setToast({
+        message: 'You cannot edit your own account.',
+        type: 'error',
+      });
+      return;
+    }
+    
     setSelectedUser(user);
-    setFormData({
+    management.setFormData({
       email: user.email || '',
       password: '',
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       roleName: user.roleName || 'user',
       isActive: user.isActive !== undefined ? user.isActive : true,
+      isEmailVerified: user.isEmailVerified !== undefined ? user.isEmailVerified : false,
     });
-    setFormErrors({});
-    setShowPassword(false);
+    management.setFormErrors({});
+    management.setShowPassword(false);
     setShowEditModal(true);
   };
 
   // Handle delete user
   const handleDelete = (user) => {
+    // Prevent deleting own account
+    if (management.isOwnAccount(user._id || user.id)) {
+      setToast({
+        message: 'You cannot delete your own account.',
+        type: 'error',
+      });
+      setOpenDropdown(null);
+      return;
+    }
+    
     setSelectedUser(user);
     setShowDeleteModal(true);
-    setOpenDropdown(null); // Close dropdown
+    setOpenDropdown(null);
   };
 
   // Handle view user
@@ -203,6 +256,7 @@ const Users = () => {
     setSelectedUser(user);
     setOpenDropdown(null); // Close dropdown
     setShowViewModal(true);
+    setActiveViewTab('details');
     setLoadingUserDetails(true);
     setViewUserDetails(null);
     
@@ -212,12 +266,12 @@ const Users = () => {
       if (response.success) {
         setViewUserDetails(response.data);
       } else {
-        setError(response.error || 'Failed to fetch user details');
+        filters.setError(response.error || 'Failed to fetch user details');
         // Fallback to using the user data we already have
         setViewUserDetails(user);
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch user details');
+      filters.setError(err.message || 'Failed to fetch user details');
       // Fallback to using the user data we already have
       setViewUserDetails(user);
     } finally {
@@ -225,31 +279,83 @@ const Users = () => {
     }
   };
 
-  // Handle deactivate/activate user
-  const handleToggleActive = async (user) => {
+  // Handle view user sessions (using hook)
+  const handleViewSessions = async (user) => {
+    setSelectedUser(user);
+    const result = await sessions.fetchUserSessions(user._id || user.id);
+    if (!result.success) {
+      filters.setError(result.error || 'Failed to fetch user sessions');
+    }
+  };
+
+  // Handle terminate session with Optimistic UI (using hook)
+  const handleTerminateSession = async (sessionId) => {
+    if (!selectedUser) return;
+    
+    const result = await sessions.handleTerminateSession(
+      selectedUser._id || selectedUser.id,
+      sessionId
+    );
+    
+    if (result.success) {
+      setToast({
+        message: 'Session terminated successfully',
+        type: 'success',
+      });
+    } else {
+      setToast({
+        message: result.error || 'Failed to terminate session',
+        type: 'error',
+      });
+    }
+  };
+
+  // Handle terminate all other sessions with Optimistic UI (using hook)
+  const handleTerminateAllOthers = async () => {
+    if (!selectedUser) return;
+    
     try {
-      setSubmitting(true);
-      const updateData = {
-        ...user,
-        isActive: !user.isActive,
-      };
-      delete updateData.password; // Don't send password
-      const response = await userService.updateUser(user._id || user.id, updateData);
-      if (response.success) {
+      const result = await sessions.handleTerminateAllOthers(
+        selectedUser._id || selectedUser.id
+      );
+      
+      if (result.success) {
         setToast({
-          message: `User ${updateData.isActive ? 'activated' : 'deactivated'} successfully!`,
+          message: result.message || 'Sessions terminated successfully',
           type: 'success',
         });
-        fetchUsers(currentPage);
-        fetchStats(); // Refresh stats
+        return result;
       } else {
-        setError(response.error || 'Failed to update user');
+        setToast({
+          message: result.error || 'Failed to terminate sessions',
+          type: 'error',
+        });
+        throw new Error(result.error || 'Failed to terminate sessions');
       }
     } catch (err) {
-      setError(err.message || 'Failed to update user');
-    } finally {
-      setSubmitting(false);
-      setOpenDropdown(null); // Close dropdown
+      setToast({
+        message: err.message || 'Failed to terminate sessions',
+        type: 'error',
+      });
+      throw err;
+    }
+  };
+
+  // Handle deactivate/activate user with Optimistic UI (using hook)
+  const handleToggleActive = async (user) => {
+    setOpenDropdown(null);
+    const result = await management.handleToggleActive(user);
+    
+    if (result.success) {
+      setToast({
+        message: `User ${!user.isActive ? 'activated' : 'deactivated'} successfully!`,
+        type: 'success',
+      });
+    } else {
+      setToast({
+        message: result.error || 'Failed to update user',
+        type: 'error',
+      });
     }
   };
 
@@ -264,27 +370,27 @@ const Users = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openDropdown]);
 
-  // Validate form
+  // Validate form (wrapper to add create modal specific validation)
   const validateForm = () => {
     const errors = {};
-    if (!formData.email) {
+    if (!management.formData.email) {
       errors.email = 'Email is required';
-    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+    } else if (!/^\S+@\S+\.\S+$/.test(management.formData.email)) {
       errors.email = 'Please provide a valid email';
     }
     // Password is only required for 'user' role in create modal
-    if (showCreateModal && formData.roleName === 'user' && !formData.password) {
+    if (showCreateModal && management.formData.roleName === 'user' && !management.formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password && formData.password.length < 6) {
+    } else if (management.formData.password && management.formData.password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
     }
-    if (!formData.firstName) {
+    if (!management.formData.firstName) {
       errors.firstName = 'First name is required';
     }
-    if (!formData.lastName) {
+    if (!management.formData.lastName) {
       errors.lastName = 'Last name is required';
     }
-    setFormErrors(errors);
+    management.setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
@@ -293,142 +399,153 @@ const Users = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    try {
-      setSubmitting(true);
-      setError(null);
-      
-      // Prepare data - don't send password for Admin/Employee (will be auto-generated)
-      const createData = { ...formData };
-      if (formData.roleName === 'admin' || formData.roleName === 'employee') {
-        delete createData.password; // Password will be auto-generated
-      }
-      
-      const response = await userService.createUser(createData);
-      if (response.success) {
-        setShowCreateModal(false);
-        setError(null);
-        // Show success toast
-        if (response.data?.user?.requiresVerification) {
-          setToast({
-            message: `User created successfully! Verification email with OTP has been sent to ${formData.email}`,
-            type: 'success',
-          });
-        } else {
-          setToast({
-            message: 'User created successfully!',
-            type: 'success',
-          });
-        }
-        fetchUsers(currentPage);
-        fetchStats(); // Refresh stats
+    // Prepare data - don't send password for Admin/Employee (will be auto-generated)
+    const createData = { ...management.formData };
+    if (management.formData.roleName === 'admin' || management.formData.roleName === 'employee') {
+      delete createData.password; // Password will be auto-generated
+    }
+    
+    management.setFormData(createData);
+    const result = await management.handleCreate();
+    
+    if (result.success) {
+      setShowCreateModal(false);
+      filters.setError(null);
+      // Show success toast
+      if (result.data?.user?.requiresVerification) {
+        setToast({
+          message: `User created successfully! Verification email with OTP has been sent to ${management.formData.email}`,
+          type: 'success',
+        });
       } else {
-        setError(response.error || 'Failed to create user');
+        setToast({
+          message: 'User created successfully!',
+          type: 'success',
+        });
       }
-    } catch (err) {
-      setError(err.message || 'Failed to create user');
-    } finally {
-      setSubmitting(false);
+      filters.refreshUsers();
+      fetchStats();
+    } else {
+      filters.setError(result.error || 'Failed to create user');
+      if (result.error) {
+        setToast({
+          message: result.error,
+          type: 'error',
+        });
+      }
     }
   };
 
-  // Submit edit
+  // Submit edit with Optimistic UI (using hook)
   const handleSubmitEdit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    try {
-      setSubmitting(true);
-      const updateData = { ...formData };
-      // Don't send password if it's empty (not changing password)
-      if (!updateData.password) {
-        delete updateData.password;
+    const userId = selectedUser?._id || selectedUser?.id;
+    if (!userId) return;
+
+    // Prevent editing own account
+    if (management.isOwnAccount(userId)) {
+      setToast({
+        message: 'You cannot edit your own account.',
+        type: 'error',
+      });
+      return;
+    }
+
+    const result = await management.handleUpdate(userId, management.formData);
+    
+    if (result.success) {
+      // Update viewUserDetails if it's the same user
+      if (viewUserDetails && (viewUserDetails._id || viewUserDetails.id) === userId) {
+        setViewUserDetails({
+          ...viewUserDetails,
+          ...management.formData,
+        });
       }
-      const response = await userService.updateUser(selectedUser._id || selectedUser.id, updateData);
-      if (response.success) {
-        setShowEditModal(false);
-        setSelectedUser(null);
-        fetchUsers(currentPage);
-        fetchStats(); // Refresh stats
-      } else {
-        setError(response.error || 'Failed to update user');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to update user');
-    } finally {
-      setSubmitting(false);
+      
+      setShowEditModal(false);
+      setSelectedUser(null);
+      setToast({
+        message: 'User updated successfully!',
+        type: 'success',
+      });
+    } else {
+      setToast({
+        message: result.error || 'Failed to update user',
+        type: 'error',
+      });
     }
   };
 
-  // Submit delete
+  // Submit delete with Optimistic UI (using hook)
   const handleSubmitDelete = async () => {
-    try {
-      setSubmitting(true);
-      const response = await userService.deleteUser(selectedUser._id || selectedUser.id);
-      if (response.success) {
-        setShowDeleteModal(false);
-        setSelectedUser(null);
-        fetchUsers(currentPage);
-        fetchStats(); // Refresh stats
-        setToast({
-          message: 'User deleted successfully!',
-          type: 'success',
-        });
-      } else {
-        setError(response.error || 'Failed to delete user');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to delete user');
-    } finally {
-      setSubmitting(false);
+    const userId = selectedUser?._id || selectedUser?.id;
+    if (!userId) return;
+    
+    setShowDeleteModal(false);
+    const userToDelete = selectedUser;
+    setSelectedUser(null);
+    
+    const result = await management.handleDelete(userId);
+    
+    if (result.success) {
+      setToast({
+        message: 'User deleted successfully!',
+        type: 'success',
+      });
+    } else {
+      setSelectedUser(userToDelete);
+      setToast({
+        message: result.error || 'Failed to delete user',
+        type: 'error',
+      });
     }
   };
 
-  // Handle restore user
+  // Handle restore user with Optimistic UI
   const handleRestore = async (user) => {
-    try {
-      setSubmitting(true);
-      const response = await userService.restoreUser(user._id || user.id);
-      if (response.success) {
-        setOpenDropdown(null);
-        fetchUsers(currentPage);
-        fetchStats(); // Refresh stats
-        setToast({
-          message: 'User restored successfully!',
-          type: 'success',
-        });
-      } else {
-        setError(response.error || 'Failed to restore user');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to restore user');
-    } finally {
-      setSubmitting(false);
+    setOpenDropdown(null);
+    const result = await management.handleRestore(user);
+    
+    if (result.success) {
+      filters.refreshUsers();
+      setToast({
+        message: 'User restored successfully!',
+        type: 'success',
+      });
+    } else {
+      setToast({
+        message: result.error || 'Failed to restore user',
+        type: 'error',
+      });
     }
   };
 
   // Export to CSV - memoized
   const handleExportCSV = useCallback(async (usersToExport = null) => {
     try {
-      let users = usersToExport;
+      filters.setError(null);
+      let usersToExportData = usersToExport;
       
       // If no users provided, fetch all users matching current filters
-      if (!users) {
+      if (!usersToExportData) {
         // Fetch with a high limit to get all users (or use multiple requests if needed)
         const response = await userService.getUsers(1, MAX_EXPORT_LIMIT, {
-          search: searchTerm,
-          role: roleFilter,
-          status: statusFilter,
-          provider: providerFilter,
-          sortBy: sortBy,
-          sortOrder: sortOrder,
+          search: filters.searchTerm,
+          role: filters.roleFilter,
+          status: filters.statusFilter,
+          provider: filters.providerFilter,
+          sortBy: filters.sortBy,
+          sortOrder: filters.sortOrder,
         });
         
         if (response && response.success) {
           // response.data is directly the array of users (same as fetchUsers)
-          users = Array.isArray(response.data) ? response.data : [];
+          usersToExportData = Array.isArray(response.data) ? response.data : [];
           
           // If we got the max limit, warn user that there might be more users
-          if (users.length === MAX_EXPORT_LIMIT && response.pagination && response.pagination.total > MAX_EXPORT_LIMIT) {
+          if (usersToExportData.length === MAX_EXPORT_LIMIT && response.pagination && response.pagination.total > MAX_EXPORT_LIMIT) {
             setToast({
               message: `Exported first 10,000 users. Total users: ${response.pagination.total}. Consider using filters to export specific users.`,
               type: 'info',
@@ -440,12 +557,12 @@ const Users = () => {
         }
       }
       
-      if (users && Array.isArray(users) && users.length > 0) {
+      if (usersToExportData && Array.isArray(usersToExportData) && usersToExportData.length > 0) {
         // Create CSV headers
         const headers = ['Email', 'First Name', 'Last Name', 'Role', 'Status', 'Email Verified', 'Provider', 'Created At'];
         
         // Create CSV rows
-        const rows = users.map(user => [
+        const rows = usersToExportData.map(user => [
           user.email || '',
           user.firstName || '',
           user.lastName || '',
@@ -479,7 +596,7 @@ const Users = () => {
         }, 100);
 
         setToast({
-          message: `Exported ${users.length} user${users.length !== 1 ? 's' : ''} to CSV`,
+          message: `Exported ${usersToExportData.length} user${usersToExportData.length !== 1 ? 's' : ''} to CSV`,
           type: 'success',
         });
       } else {
@@ -489,18 +606,27 @@ const Users = () => {
         });
       }
     } catch (err) {
-      setError(err.message || 'Failed to export users');
+      filters.setError(err.message || 'Failed to export users');
       setToast({
         message: err.message || 'Failed to export users',
         type: 'error',
       });
     }
-  }, [searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
+  }, [filters]);
 
   // Handle checkbox selection
   const handleSelectUser = (userId, user) => {
     // Don't allow selecting deleted users
     if (user?.deletedAt) return;
+    
+    // Don't allow selecting current user
+    if (currentUserId && (userId === currentUserId || userId.toString() === currentUserId.toString())) {
+      setToast({
+        message: 'You cannot select your own account',
+        type: 'warning',
+      });
+      return;
+    }
     
     setSelectedUsers(prev => 
       prev.includes(userId) 
@@ -514,9 +640,16 @@ const Users = () => {
     if (selectedUsers.length === filteredUsers.length) {
       setSelectedUsers([]);
     } else {
-      // Only select non-deleted users
+      // Only select non-deleted users and exclude current user
       setSelectedUsers(filteredUsers
-        .filter(user => !user.deletedAt)
+        .filter(user => {
+          if (user.deletedAt) return false;
+          if (currentUserId) {
+            const userId = user._id || user.id;
+            return !(userId === currentUserId || userId.toString() === currentUserId.toString());
+          }
+          return true;
+        })
         .map(user => user._id || user.id));
     }
   };
@@ -527,54 +660,59 @@ const Users = () => {
     setShowBulkDeleteModal(true);
   }, [selectedUsers.length]);
 
-  // Confirm and execute bulk delete
+  // Confirm and execute bulk delete with Optimistic UI (using hook)
   const confirmBulkDelete = async () => {
     if (selectedUsers.length === 0) return;
 
-    try {
-      setSubmitting(true);
-      setBulkDeleteProgress({ current: 0, total: selectedUsers.length });
-      
-      const results = { success: 0, failed: 0 };
-      const errors = [];
-
-      // Delete users one by one to show progress and handle errors gracefully
-      for (let i = 0; i < selectedUsers.length; i++) {
-        try {
-          await userService.deleteUser(selectedUsers[i]);
-          results.success++;
-        } catch (err) {
-          results.failed++;
-          errors.push(err.message || 'Failed to delete user');
-        }
-        setBulkDeleteProgress({ current: i + 1, total: selectedUsers.length });
+    // Filter out current user from bulk delete
+    const usersToDelete = selectedUsers.filter(userId => {
+      if (currentUserId && (userId === currentUserId || userId.toString() === currentUserId.toString())) {
+        return false;
       }
-      
+      return true;
+    });
+
+    // If current user was in selection, show warning
+    if (usersToDelete.length < selectedUsers.length) {
+      setToast({
+        message: 'You cannot delete your own account. Other selected users will be deleted.',
+        type: 'warning',
+      });
+    }
+
+    if (usersToDelete.length === 0) {
       setShowBulkDeleteModal(false);
       setSelectedUsers([]);
-      fetchUsers(currentPage);
-      fetchStats();
-      
-      if (results.failed === 0) {
-        setToast({
-          message: `Successfully deleted ${results.success} user${results.success !== 1 ? 's' : ''}`,
-          type: 'success',
-        });
-      } else {
-        setToast({
-          message: `Deleted ${results.success} user${results.success !== 1 ? 's' : ''}, ${results.failed} failed`,
-          type: 'error',
-        });
-        if (errors.length > 0) {
-          setError(errors.slice(0, 3).join('; '));
-        }
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to delete users');
-    } finally {
-      setSubmitting(false);
-      setBulkDeleteProgress({ current: 0, total: 0 });
+      setToast({
+        message: 'You cannot delete your own account',
+        type: 'error',
+      });
+      return;
     }
+
+    setSelectedUsers([]);
+    setShowBulkDeleteModal(false);
+    setBulkDeleteProgress({ current: 0, total: usersToDelete.length });
+
+    // Use hook's bulk delete with progress tracking
+    const result = await management.handleBulkDelete(usersToDelete);
+    
+    if (result.success) {
+      setToast({
+        message: result.message || `Successfully deleted ${result.successCount} user(s)`,
+        type: 'success',
+      });
+    } else {
+      setToast({
+        message: result.message || `Failed to delete ${result.failureCount || 0} user(s)`,
+        type: 'error',
+      });
+      if (result.errors && result.errors.length > 0) {
+        filters.setError(result.errors.slice(0, 3).join('; '));
+      }
+    }
+    
+    setBulkDeleteProgress({ current: 0, total: 0 });
   };
 
   // Bulk export selected users
@@ -648,7 +786,7 @@ const Users = () => {
               e.preventDefault();
               e.stopPropagation();
               handleExportCSV().catch(err => {
-                setError(err.message || 'Failed to export users');
+                filters.setError(err.message || 'Failed to export users');
                 setToast({
                   message: err.message || 'Failed to export users',
                   type: 'error',
@@ -698,13 +836,7 @@ const Users = () => {
       </div>
 
       {/* Stats Bar */}
-      <UserStats stats={stats} loading={loading} />
-
-      {error && (
-        <div className="mb-3 p-2.5 text-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
-        </div>
-      )}
+      <UserStats stats={stats} loading={filters.loading} />
 
       {/* Bulk Actions Bar - Shows when users are selected */}
       {selectedUsers.length > 0 ? (
@@ -724,7 +856,7 @@ const Users = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleBulkExport}
-                disabled={submitting}
+                disabled={management.submitting}
                 className="px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 rounded-md text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -735,7 +867,7 @@ const Users = () => {
               </button>
               <button
                 onClick={handleBulkDelete}
-                disabled={submitting}
+                disabled={management.submitting}
                 className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -750,24 +882,24 @@ const Users = () => {
       ) : (
         /* Filters - Shows when no users are selected */
         <UserFilters
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          roleFilter={roleFilter}
-          setRoleFilter={setRoleFilter}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          providerFilter={providerFilter}
-          setProviderFilter={setProviderFilter}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-          sortOrder={sortOrder}
-          setSortOrder={setSortOrder}
+          searchTerm={filters.searchTerm}
+          setSearchTerm={filters.setSearchTerm}
+          roleFilter={filters.roleFilter}
+          setRoleFilter={filters.setRoleFilter}
+          statusFilter={filters.statusFilter}
+          setStatusFilter={filters.setStatusFilter}
+          providerFilter={filters.providerFilter}
+          setProviderFilter={filters.setProviderFilter}
+          sortBy={filters.sortBy}
+          setSortBy={filters.setSortBy}
+          sortOrder={filters.sortOrder}
+          setSortOrder={filters.setSortOrder}
         />
       )}
 
       {/* Users Table */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-        {loading ? (
+        {filters.loading ? (
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">Loading users...</p>
           </div>
@@ -819,14 +951,16 @@ const Users = () => {
                   {filteredUsers.map((user) => {
                     const userId = user._id || user.id;
                     const isSelected = selectedUsers.includes(userId);
+                    const isCurrentUser = currentUserId && (userId === currentUserId || userId.toString() === currentUserId.toString());
                     return (
-                    <tr key={userId} className={`hover:bg-gray-50 dark:hover:bg-slate-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                    <tr key={userId} className={`hover:bg-gray-50 dark:hover:bg-slate-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''} ${isCurrentUser ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}`}>
                       <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap">
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          disabled={!!user.deletedAt}
+                          disabled={!!user.deletedAt || isCurrentUser}
                           onChange={() => handleSelectUser(userId, user)}
+                          title={isCurrentUser ? "You cannot select your own account" : user.deletedAt ? "Cannot select deleted user" : "Select user"}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </td>
@@ -840,10 +974,15 @@ const Users = () => {
                             </div>
                           </div>
                           <div className="ml-2 sm:ml-3 min-w-0 flex-1">
-                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">
+                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate flex items-center gap-2">
                               {user.firstName && user.lastName
                                 ? `${user.firstName} ${user.lastName}`
                                 : user.email}
+                              {isCurrentUser && (
+                                <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 dark:bg-blue-500 text-white">
+                                  You
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-slate-400 truncate">
                               {user.email}
@@ -1017,7 +1156,7 @@ const Users = () => {
                                   {/* Restore */}
                                   <button
                                     onClick={() => handleRestore(user)}
-                                    disabled={submitting}
+                                    disabled={management.submitting}
                                     className="w-full px-4 py-2.5 text-sm text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 disabled:opacity-50"
                                   >
                                     <svg
@@ -1067,14 +1206,55 @@ const Users = () => {
                                   
                                   {/* Edit */}
                                   <button
-                                    onClick={() => {
+                                    type="button"
+                                    className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
+                                      isCurrentUser
+                                        ? 'text-gray-400 dark:text-gray-500 opacity-50'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
+                                    }`}
+                                    title={isCurrentUser ? "You cannot edit your own account" : "Edit user"}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      
+                                      // Always check if this is current user with localStorage fallback
+                                      const userId = user._id || user.id;
+                                      const userIdStr = String(userId || '');
+                                      
+                                      // Get current user ID from state or localStorage as fallback
+                                      let currentUserIdToCheck = currentUserId;
+                                      if (!currentUserIdToCheck) {
+                                        try {
+                                          const storedUser = authService.getStoredUser();
+                                          currentUserIdToCheck = storedUser?.id || storedUser?._id;
+                                        } catch {
+                                          // Ignore
+                                        }
+                                      }
+                                      const currentUserIdStr = String(currentUserIdToCheck || '');
+                                      
+                                      // Multiple comparison methods to ensure we catch it
+                                      const isOwnAccount = currentUserIdToCheck && userId && (
+                                        userId === currentUserIdToCheck || 
+                                        userIdStr === currentUserIdStr ||
+                                        userId.toString() === currentUserIdToCheck.toString() ||
+                                        String(userId) === String(currentUserIdToCheck)
+                                      );
+                                      
+                                      if (isOwnAccount || isCurrentUser) {
+                                        setToast({
+                                          message: 'You cannot edit your own account.',
+                                          type: 'error',
+                                        });
+                                        return;
+                                      }
                                       handleEdit(user);
                                       setOpenDropdown(null);
                                     }}
-                                    className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                                    disabled={false}
                                   >
                                     <svg
-                                      className="w-4 h-4 text-gray-600 dark:text-gray-400"
+                                      className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-400'}`}
                                       fill="none"
                                       stroke="currentColor"
                                       viewBox="0 0 24 24"
@@ -1086,19 +1266,66 @@ const Users = () => {
                                         d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                       />
                                     </svg>
-                                    <span>Edit</span>
+                                    <span className={isCurrentUser ? 'line-through' : ''}>Edit</span>
                                   </button>
                                   
                                   {/* Deactivate/Activate */}
                                   <button
-                                    onClick={() => handleToggleActive(user)}
-                                    disabled={submitting}
-                                    className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 disabled:opacity-50"
+                                    type="button"
+                                    className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
+                                      isCurrentUser
+                                        ? 'text-gray-400 dark:text-gray-500 opacity-50 cursor-pointer'
+                                        : user.isActive
+                                        ? 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
+                                    } ${management.submitting && !isCurrentUser ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={isCurrentUser ? "You cannot deactivate your own account" : user.isActive ? "Deactivate user" : "Activate user"}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      
+                                      // Always check if this is current user - don't rely on isCurrentUser variable
+                                      const userId = user._id || user.id;
+                                      const userIdStr = String(userId || '');
+                                      
+                                      // Get current user ID from state or localStorage as fallback
+                                      let currentUserIdToCheck = currentUserId;
+                                      if (!currentUserIdToCheck) {
+                                        try {
+                                          const storedUser = authService.getStoredUser();
+                                          currentUserIdToCheck = storedUser?.id || storedUser?._id;
+                                        } catch {
+                                          // Ignore
+                                        }
+                                      }
+                                      const currentUserIdStr = String(currentUserIdToCheck || '');
+                                      
+                                      // Multiple comparison methods to ensure we catch it
+                                      const isOwnAccount = currentUserIdToCheck && userId && (
+                                        userId === currentUserIdToCheck || 
+                                        userIdStr === currentUserIdStr ||
+                                        userId.toString() === currentUserIdToCheck.toString() ||
+                                        String(userId) === String(currentUserIdToCheck)
+                                      );
+                                      
+                                      if (isOwnAccount || isCurrentUser) {
+                                        setToast({
+                                          message: 'You cannot deactivate your own account.',
+                                          type: 'error',
+                                        });
+                                        return; // CRITICAL: Must return here to prevent API call
+                                      }
+                                      
+                                      if (management.submitting) return;
+                                      handleToggleActive(user);
+                                      setOpenDropdown(null);
+                                    }}
+                                    disabled={false}
                                   >
                                     {user.isActive ? (
                                       <>
                                         <svg
-                                          className="w-4 h-4 text-amber-600 dark:text-amber-400"
+                                          className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-gray-500' : 'text-amber-600 dark:text-amber-400'}`}
                                           fill="none"
                                           stroke="currentColor"
                                           viewBox="0 0 24 24"
@@ -1110,12 +1337,12 @@ const Users = () => {
                                             d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
                                           />
                                         </svg>
-                                        <span>Deactivate</span>
+                                        <span className={isCurrentUser ? 'line-through' : ''}>Deactivate</span>
                                       </>
                                     ) : (
                                       <>
                                         <svg
-                                          className="w-4 h-4 text-green-600 dark:text-green-400"
+                                          className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-gray-500' : 'text-green-600 dark:text-green-400'}`}
                                           fill="none"
                                           stroke="currentColor"
                                           viewBox="0 0 24 24"
@@ -1127,18 +1354,60 @@ const Users = () => {
                                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                                           />
                                         </svg>
-                                        <span>Activate</span>
+                                        <span className={isCurrentUser ? 'line-through' : ''}>Activate</span>
                                       </>
                                     )}
                                   </button>
                                   
                                   {/* Delete */}
                                   <button
-                                    onClick={() => handleDelete(user)}
-                                    className="w-full px-4 py-2.5 text-sm text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                                    className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
+                                      isCurrentUser
+                                        ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                                        : 'text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
+                                    }`}
+                                    title={isCurrentUser ? "You cannot delete your own account" : "Delete user"}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      
+                                      // Always check if this is current user with localStorage fallback
+                                      const userId = user._id || user.id;
+                                      const userIdStr = String(userId || '');
+                                      
+                                      // Get current user ID from state or localStorage as fallback
+                                      let currentUserIdToCheck = currentUserId;
+                                      if (!currentUserIdToCheck) {
+                                        try {
+                                          const storedUser = authService.getStoredUser();
+                                          currentUserIdToCheck = storedUser?.id || storedUser?._id;
+                                        } catch {
+                                          // Ignore
+                                        }
+                                      }
+                                      const currentUserIdStr = String(currentUserIdToCheck || '');
+                                      
+                                      // Multiple comparison methods to ensure we catch it
+                                      const isOwnAccount = currentUserIdToCheck && userId && (
+                                        userId === currentUserIdToCheck || 
+                                        userIdStr === currentUserIdStr ||
+                                        userId.toString() === currentUserIdToCheck.toString() ||
+                                        String(userId) === String(currentUserIdToCheck)
+                                      );
+                                      
+                                      if (isOwnAccount || isCurrentUser) {
+                                        setToast({
+                                          message: 'You cannot delete your own account.',
+                                          type: 'error',
+                                        });
+                                        return;
+                                      }
+                                      handleDelete(user);
+                                    }}
+                                    disabled={false}
                                   >
                                     <svg
-                                      className="w-4 h-4"
+                                      className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-gray-500' : 'text-red-600 dark:text-red-400'}`}
                                       fill="none"
                                       stroke="currentColor"
                                       viewBox="0 0 24 24"
@@ -1150,7 +1419,7 @@ const Users = () => {
                                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                       />
                                     </svg>
-                                    <span>Delete</span>
+                                    <span className={isCurrentUser ? 'line-through text-gray-400 dark:text-gray-500' : 'text-red-600 dark:text-red-400'}>Delete</span>
                                   </button>
                                 </>
                               )}
@@ -1166,13 +1435,13 @@ const Users = () => {
             </div>
             
             {/* Pagination - Only show if totalUsers > 10 */}
-            {totalUsers > 10 && (
+            {filters.totalUsers > 10 && (
               <div className="px-4 py-2 border-t border-gray-200 dark:border-slate-700 flex items-center justify-center">
                 <div className="flex items-center gap-0.5">
                   {/* First Page */}
                   <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1 || loading}
+                    onClick={() => filters.setCurrentPage(1)}
+                    disabled={filters.currentPage === 1 || filters.loading}
                     className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
                     title="First page"
                   >
@@ -1183,8 +1452,8 @@ const Users = () => {
                   
                   {/* Previous Page */}
                   <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1 || loading}
+                    onClick={() => filters.setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={filters.currentPage === 1 || filters.loading}
                     className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
                     title="Previous page"
                   >
@@ -1198,18 +1467,18 @@ const Users = () => {
                     disabled
                     className="w-7 h-7 flex items-center justify-center bg-blue-600 dark:bg-blue-500 text-white text-xs font-medium"
                   >
-                    {currentPage}
+                    {filters.currentPage}
                   </button>
                   
                   {/* Page Info */}
                   <span className="px-1.5 text-xs text-gray-700 dark:text-gray-400">
-                    of {totalPages}
+                    of {filters.totalPages}
                   </span>
                   
                   {/* Next Page */}
                   <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages || loading}
+                    onClick={() => filters.setCurrentPage(prev => Math.min(filters.totalPages, prev + 1))}
+                    disabled={filters.currentPage === filters.totalPages || filters.loading}
                     className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
                     title="Next page"
                   >
@@ -1220,8 +1489,8 @@ const Users = () => {
                   
                   {/* Last Page */}
                   <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages || loading}
+                    onClick={() => filters.setCurrentPage(filters.totalPages)}
+                    disabled={filters.currentPage === filters.totalPages || filters.loading}
                     className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
                     title="Last page"
                   >
@@ -1252,40 +1521,40 @@ const Users = () => {
                     </label>
                     <input
                       type="email"
-                      value={formData.email}
+                      value={management.formData.email}
                       onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
+                        management.setFormData({ ...management.formData, email: e.target.value })
                       }
                       className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                     />
-                    {formErrors.email && (
+                    {management.formErrors.email && (
                       <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {formErrors.email}
+                        {management.formErrors.email}
                       </p>
                     )}
                   </div>
 
                   {/* Password field - only show for 'user' role */}
-                  {formData.roleName === 'user' ? (
+                  {management.formData.roleName === 'user' ? (
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Password *
                       </label>
                       <div className="relative">
                         <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={formData.password}
+                          type={management.showPassword ? 'text' : 'password'}
+                          value={management.formData.password}
                           onChange={(e) =>
-                            setFormData({ ...formData, password: e.target.value })
+                            management.setFormData({ ...management.formData, password: e.target.value })
                           }
                           className="w-full px-2.5 py-1.5 pr-9 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                         />
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
+                          onClick={() => management.setShowPassword(!management.showPassword)}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                         >
-                          {showPassword ? (
+                          {management.showPassword ? (
                             <svg
                               className="w-4 h-4"
                               fill="none"
@@ -1322,9 +1591,9 @@ const Users = () => {
                           )}
                         </button>
                       </div>
-                      {formErrors.password && (
+                      {management.formErrors.password && (
                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {formErrors.password}
+                          {management.formErrors.password}
                         </p>
                       )}
                     </div>
@@ -1343,15 +1612,15 @@ const Users = () => {
                       </label>
                       <input
                         type="text"
-                        value={formData.firstName}
+                        value={management.formData.firstName}
                         onChange={(e) =>
-                          setFormData({ ...formData, firstName: e.target.value })
+                          management.setFormData({ ...management.formData, firstName: e.target.value })
                         }
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                       />
-                      {formErrors.firstName && (
+                      {management.formErrors.firstName && (
                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {formErrors.firstName}
+                          {management.formErrors.firstName}
                         </p>
                       )}
                     </div>
@@ -1362,15 +1631,15 @@ const Users = () => {
                       </label>
                       <input
                         type="text"
-                        value={formData.lastName}
+                        value={management.formData.lastName}
                         onChange={(e) =>
-                          setFormData({ ...formData, lastName: e.target.value })
+                          management.setFormData({ ...management.formData, lastName: e.target.value })
                         }
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                       />
-                      {formErrors.lastName && (
+                      {management.formErrors.lastName && (
                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {formErrors.lastName}
+                          {management.formErrors.lastName}
                         </p>
                       )}
                     </div>
@@ -1381,9 +1650,9 @@ const Users = () => {
                       Role *
                     </label>
                     <select
-                      value={formData.roleName}
+                      value={management.formData.roleName}
                       onChange={(e) =>
-                        setFormData({ ...formData, roleName: e.target.value })
+                        management.setFormData({ ...management.formData, roleName: e.target.value })
                       }
                       className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                     >
@@ -1397,9 +1666,9 @@ const Users = () => {
                     <input
                       type="checkbox"
                       id="isActive"
-                      checked={formData.isActive}
+                      checked={management.formData.isActive}
                       onChange={(e) =>
-                        setFormData({ ...formData, isActive: e.target.checked })
+                        management.setFormData({ ...management.formData, isActive: e.target.checked })
                       }
                       className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
                     />
@@ -1422,10 +1691,20 @@ const Users = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting}
-                    className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow"
+                    disabled={management.submitting}
+                    className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
                   >
-                    {submitting ? 'Creating...' : 'Create User'}
+                    {management.submitting ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      'Create User'
+                    )}
                   </button>
                 </div>
               </form>
@@ -1435,7 +1714,7 @@ const Users = () => {
       )}
 
       {/* Edit Modal */}
-      {showEditModal && (
+      {shouldShowEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4">
@@ -1450,15 +1729,15 @@ const Users = () => {
                     </label>
                     <input
                       type="email"
-                      value={formData.email}
+                      value={management.formData.email}
                       onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
+                        management.setFormData({ ...management.formData, email: e.target.value })
                       }
                       className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                     />
-                    {formErrors.email && (
+                    {management.formErrors.email && (
                       <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {formErrors.email}
+                        {management.formErrors.email}
                       </p>
                     )}
                   </div>
@@ -1469,19 +1748,19 @@ const Users = () => {
                     </label>
                     <div className="relative">
                       <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.password}
+                        type={management.showPassword ? 'text' : 'password'}
+                        value={management.formData.password}
                         onChange={(e) =>
-                          setFormData({ ...formData, password: e.target.value })
+                          management.setFormData({ ...management.formData, password: e.target.value })
                         }
                         className="w-full px-2.5 py-1.5 pr-9 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
+                        onClick={() => management.setShowPassword(!management.showPassword)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                       >
-                        {showPassword ? (
+                        {management.showPassword ? (
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -1518,9 +1797,9 @@ const Users = () => {
                         )}
                       </button>
                     </div>
-                    {formErrors.password && (
+                    {management.formErrors.password && (
                       <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {formErrors.password}
+                        {management.formErrors.password}
                       </p>
                     )}
                   </div>
@@ -1532,15 +1811,15 @@ const Users = () => {
                       </label>
                       <input
                         type="text"
-                        value={formData.firstName}
+                        value={management.formData.firstName}
                         onChange={(e) =>
-                          setFormData({ ...formData, firstName: e.target.value })
+                          management.setFormData({ ...management.formData, firstName: e.target.value })
                         }
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                       />
-                      {formErrors.firstName && (
+                      {management.formErrors.firstName && (
                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {formErrors.firstName}
+                          {management.formErrors.firstName}
                         </p>
                       )}
                     </div>
@@ -1551,15 +1830,15 @@ const Users = () => {
                       </label>
                       <input
                         type="text"
-                        value={formData.lastName}
+                        value={management.formData.lastName}
                         onChange={(e) =>
-                          setFormData({ ...formData, lastName: e.target.value })
+                          management.setFormData({ ...management.formData, lastName: e.target.value })
                         }
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                       />
-                      {formErrors.lastName && (
+                      {management.formErrors.lastName && (
                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {formErrors.lastName}
+                          {management.formErrors.lastName}
                         </p>
                       )}
                     </div>
@@ -1570,9 +1849,9 @@ const Users = () => {
                       Role *
                     </label>
                     <select
-                      value={formData.roleName}
+                      value={management.formData.roleName}
                       onChange={(e) =>
-                        setFormData({ ...formData, roleName: e.target.value })
+                        management.setFormData({ ...management.formData, roleName: e.target.value })
                       }
                       className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
                     >
@@ -1587,9 +1866,9 @@ const Users = () => {
                       <input
                         type="checkbox"
                         id="editIsActive"
-                        checked={formData.isActive}
+                        checked={management.formData.isActive}
                         onChange={(e) =>
-                          setFormData({ ...formData, isActive: e.target.checked })
+                          management.setFormData({ ...management.formData, isActive: e.target.checked })
                         }
                         className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
                       />
@@ -1604,9 +1883,9 @@ const Users = () => {
                       <input
                         type="checkbox"
                         id="editIsEmailVerified"
-                        checked={formData.isEmailVerified}
+                        checked={management.formData.isEmailVerified}
                         onChange={(e) =>
-                          setFormData({ ...formData, isEmailVerified: e.target.checked })
+                          management.setFormData({ ...management.formData, isEmailVerified: e.target.checked })
                         }
                         className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
                       />
@@ -1633,10 +1912,20 @@ const Users = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting}
-                    className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow"
+                    disabled={management.submitting}
+                    className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
                   >
-                    {submitting ? 'Updating...' : 'Update User'}
+                    {management.submitting ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      'Update User'
+                    )}
                   </button>
                 </div>
               </form>
@@ -1678,17 +1967,27 @@ const Users = () => {
                     setShowBulkDeleteModal(false);
                     setBulkDeleteProgress({ current: 0, total: 0 });
                   }}
-                  disabled={submitting}
+                  disabled={management.submitting}
                   className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmBulkDelete}
-                  disabled={submitting}
-                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  disabled={management.submitting}
+                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {submitting ? 'Deleting...' : 'Delete'}
+                  {management.submitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
                 </button>
               </div>
             </div>
@@ -1697,7 +1996,7 @@ const Users = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
+      {shouldShowDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4">
@@ -1726,10 +2025,20 @@ const Users = () => {
                 </button>
                 <button
                   onClick={handleSubmitDelete}
-                  disabled={submitting}
-                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  disabled={management.submitting}
+                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {submitting ? 'Deleting...' : 'Delete User'}
+                  {management.submitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    'Delete User'
+                  )}
                 </button>
               </div>
             </div>
@@ -1740,8 +2049,10 @@ const Users = () => {
       {/* View User Modal */}
       {showViewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+          <div className={`bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-h-[90vh] flex flex-col ${
+            activeViewTab === 'sessions' ? 'max-w-4xl' : 'max-w-2xl'
+          }`}>
+            <div className={`p-6 ${activeViewTab === 'sessions' ? 'flex-shrink-0' : 'overflow-y-auto'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
                   User Details
@@ -1751,6 +2062,9 @@ const Users = () => {
                     setShowViewModal(false);
                     setSelectedUser(null);
                     setViewUserDetails(null);
+                    setActiveViewTab('details');
+                        sessions.setUserSessions([]);
+                        sessions.setSelectedSessionForMap(null);
                   }}
                   className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 >
@@ -1760,28 +2074,72 @@ const Users = () => {
                 </button>
               </div>
 
-              {loadingUserDetails ? (
+              {/* Avatar and Basic Info */}
+              {viewUserDetails && (
+                <div className="flex items-center gap-4 pb-4 mb-4 border-b border-gray-200 dark:border-slate-700">
+                  <div className={`h-16 w-16 rounded-full ${getAvatarColor(viewUserDetails)} flex items-center justify-center`}>
+                    <span className="text-xl font-medium text-white">
+                      {getInitials(viewUserDetails)}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+                      {viewUserDetails.firstName && viewUserDetails.lastName
+                        ? `${viewUserDetails.firstName} ${viewUserDetails.lastName}`
+                        : viewUserDetails.email}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{viewUserDetails.email}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabs - Segmented Control Style */}
+              <div className="flex gap-0 mb-6 bg-gray-100 dark:bg-slate-700/50 p-0.5 rounded-lg">
+                <button
+                  onClick={() => {
+                    setActiveViewTab('details');
+                    if (!viewUserDetails && selectedUser) {
+                      handleView(selectedUser);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-1 justify-center ${
+                    activeViewTab === 'details'
+                      ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-slate-100'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>User Details</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveViewTab('sessions');
+                    if (selectedUser) {
+                      handleViewSessions(selectedUser);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-1 justify-center ${
+                    activeViewTab === 'sessions'
+                      ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-slate-100'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>User Sessions</span>
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              {loadingUserDetails && activeViewTab === 'details' ? (
                 <div className="py-8 text-center">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Loading user details...</p>
                 </div>
-              ) : viewUserDetails ? (
+              ) : activeViewTab === 'details' && viewUserDetails ? (
                 <div className="space-y-4">
-                  {/* Avatar and Basic Info */}
-                  <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-slate-700">
-                    <div className={`h-16 w-16 rounded-full ${getAvatarColor(viewUserDetails)} flex items-center justify-center`}>
-                      <span className="text-xl font-medium text-white">
-                        {getInitials(viewUserDetails)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
-                        {viewUserDetails.firstName && viewUserDetails.lastName
-                          ? `${viewUserDetails.firstName} ${viewUserDetails.lastName}`
-                          : viewUserDetails.email}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{viewUserDetails.email}</p>
-                    </div>
-                  </div>
 
                   {/* User Information Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1956,36 +2314,91 @@ const Users = () => {
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : activeViewTab === 'details' ? (
                 <div className="py-8 text-center">
                   <p className="text-sm text-red-600 dark:text-red-400">Failed to load user details</p>
                 </div>
+              ) : null}
+
+              {/* Sessions Tab Content */}
+              {activeViewTab === 'sessions' && (
+                <div className="flex-1 overflow-hidden px-6 pb-6 -mx-6">
+                  {sessions.loadingSessions ? (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Loading sessions...</p>
+                    </div>
+                  ) : (
+                    <UserSessions
+                      user={selectedUser}
+                      sessions={sessions.userSessions}
+                      loading={sessions.loadingSessions}
+                      onClose={() => {
+                        setShowViewModal(false);
+                        setSelectedUser(null);
+                        sessions.setUserSessions([]);
+                        sessions.setSelectedSessionForMap(null);
+                        setActiveViewTab('details');
+                      }}
+                      onTerminateSession={handleTerminateSession}
+                      onTerminateAllOthers={handleTerminateAllOthers}
+                      submitting={sessions.submitting}
+                    />
+                  )}
+                </div>
               )}
 
-              {/* Modal Footer */}
-              <div className="mt-6 flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-slate-700">
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setSelectedUser(null);
-                    setViewUserDetails(null);
-                  }}
-                  className="px-4 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
-                >
-                  Close
-                </button>
-                {viewUserDetails && (
+              {/* Modal Footer - Only show for Details tab */}
+              {activeViewTab === 'details' && (
+                <div className="mt-6 flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-slate-700">
                   <button
                     onClick={() => {
                       setShowViewModal(false);
-                      handleEdit(viewUserDetails);
+                      setSelectedUser(null);
+                      setViewUserDetails(null);
+                      setActiveViewTab('details');
+                        sessions.setUserSessions([]);
+                        sessions.setSelectedSessionForMap(null);
                     }}
-                    className="px-4 py-2 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 shadow-sm hover:shadow-md transition-shadow"
+                    className="px-4 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                   >
-                    Edit User
+                    Close
                   </button>
-                )}
-              </div>
+                  {viewUserDetails && (() => {
+                    const viewUserId = viewUserDetails._id || viewUserDetails.id;
+                    const isViewingCurrentUser = currentUserId && (viewUserId === currentUserId || viewUserId?.toString() === currentUserId.toString());
+                    return (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          // Double check before calling handler
+                          if (isViewingCurrentUser) {
+                            setToast({
+                              message: 'You cannot edit your own account.',
+                              type: 'error',
+                            });
+                            return;
+                          }
+                          
+                          setShowViewModal(false);
+                          handleEdit(viewUserDetails);
+                        }}
+                        disabled={isViewingCurrentUser}
+                        title={isViewingCurrentUser ? "You cannot edit your own account" : "Edit user"}
+                        className={`px-4 py-2 text-sm rounded-md shadow-sm hover:shadow-md transition-shadow ${
+                          isViewingCurrentUser
+                            ? 'bg-gray-400 dark:bg-gray-600 text-white cursor-not-allowed opacity-50 pointer-events-none'
+                            : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
+                        }`}
+                        style={isViewingCurrentUser ? { pointerEvents: 'none' } : {}}
+                      >
+                        Edit User
+                      </button>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           </div>
         </div>

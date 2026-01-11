@@ -8,6 +8,9 @@ const {
   deleteUser,
   restoreUser,
   getUserStats,
+  getUserSessions,
+  terminateSession,
+  terminateAllOtherSessions,
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 const {
@@ -24,6 +27,9 @@ router.use(protect);
 router.post('/employees', authorize('admin'), validateCreateUser, createEmployee);
 router.get('/', authorize('admin'), validatePagination, getUsers);
 router.get('/stats', authorize('admin'), getUserStats);
+router.get('/:id/sessions', authorize('admin'), validateMongoId, getUserSessions);
+router.delete('/:id/sessions', authorize('admin'), validateMongoId, terminateAllOtherSessions);
+router.delete('/:id/sessions/:sessionId', authorize('admin'), validateMongoId, terminateSession);
 router.delete('/:id', authorize('admin'), validateMongoId, deleteUser);
 router.post('/:id/restore', authorize('admin'), validateMongoId, restoreUser);
 

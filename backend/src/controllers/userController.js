@@ -1,6 +1,7 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const User = require('../models/User');
 const Role = require('../models/Role');
+const Session = require('../models/Session');
 const { generateOTP, getOTPExpiry } = require('../utils/generateOTP');
 const { sendOTPEmail } = require('../services/emailService');
 const crypto = require('crypto');
@@ -265,6 +266,16 @@ exports.updateUser = asyncHandler(async (req, res) => {
     delete updateData.isActive;
   }
 
+  // Prevent admins from editing/deactivating their own account
+  if (req.user.roleName === 'admin' && req.user.id === req.params.id) {
+    // Completely prevent editing own account through admin panel
+    // This prevents accidental self-modification that could lock the admin out
+    return res.status(400).json({
+      success: false,
+      error: 'You cannot edit your own account.',
+    });
+  }
+
   // Handle password update - need to hash it before saving
   // If password is provided, mark it as modified so the pre-save hook will hash it
   if (updateData.password) {
@@ -373,5 +384,130 @@ exports.getUserStats = asyncHandler(async (req, res) => {
       active: activeUsers,
       unverified: unverifiedUsers,
     },
+  });
+});
+
+// @desc    Get user sessions (Admin only)
+// @route   GET /api/users/:id/sessions
+// @access  Private/Admin
+exports.getUserSessions = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const currentToken = req.headers.authorization?.split(' ')[1];
+
+  // Build query for active sessions
+  const query = {
+    user: userId,
+    isActive: true,
+    expiresAt: { $gt: new Date() },
+  };
+
+  // Get all active sessions (no pagination - show all in scrollable list)
+  const sessions = await Session.find(query)
+    .sort({ lastActive: -1 })
+    .select('-token'); // Don't expose tokens
+
+  // Mark current session
+  const sessionsWithCurrent = sessions.map((session) => {
+    const sessionObj = session.toObject();
+    sessionObj.isCurrent = false;
+    return sessionObj;
+  });
+
+  // Mark the session matching current token as current
+  if (sessionsWithCurrent.length > 0 && currentToken) {
+    const currentSession = await Session.findOne({
+      user: userId,
+      token: currentToken,
+      isActive: true,
+    }).select('_id');
+    
+    if (currentSession) {
+      sessionsWithCurrent.forEach((session) => {
+        if (session._id.toString() === currentSession._id.toString()) {
+          session.isCurrent = true;
+        }
+      });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    data: sessionsWithCurrent,
+  });
+});
+
+// @desc    Terminate user session (Admin only)
+// @route   DELETE /api/users/:id/sessions/:sessionId
+// @access  Private/Admin
+exports.terminateSession = asyncHandler(async (req, res) => {
+  const { id: userId, sessionId } = req.params;
+
+  const session = await Session.findOne({
+    _id: sessionId,
+    user: userId,
+    isActive: true,
+  });
+
+  if (!session) {
+    return res.status(404).json({
+      success: false,
+      error: 'Session not found',
+    });
+  }
+
+  // Deactivate session
+  session.isActive = false;
+  await session.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Session terminated successfully',
+  });
+});
+
+// @desc    Terminate all other user sessions except current (Admin only)
+// @route   DELETE /api/users/:id/sessions
+// @access  Private/Admin
+exports.terminateAllOtherSessions = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const currentToken = req.headers.authorization?.split(' ')[1];
+
+  if (!currentToken) {
+    return res.status(400).json({
+      success: false,
+      error: 'Current session token is required',
+    });
+  }
+
+  // Find the current session
+  const currentSession = await Session.findOne({
+    user: userId,
+    token: currentToken,
+    isActive: true,
+  });
+
+  if (!currentSession) {
+    return res.status(404).json({
+      success: false,
+      error: 'Current session not found',
+    });
+  }
+
+  // Deactivate all other sessions except the current one
+  const result = await Session.updateMany(
+    {
+      user: userId,
+      isActive: true,
+      _id: { $ne: currentSession._id },
+    },
+    {
+      $set: { isActive: false },
+    }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: `Terminated ${result.modifiedCount} session(s) successfully`,
+    terminatedCount: result.modifiedCount,
   });
 });

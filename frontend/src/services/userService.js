@@ -50,6 +50,21 @@ const userService = {
   getUserStats: async () => {
     return await api.get(`${API_ENDPOINTS.users}/stats`);
   },
+
+  // Get user sessions (Admin only) - all sessions, no pagination
+  getUserSessions: async (userId) => {
+    return await api.get(`${API_ENDPOINTS.users}/${userId}/sessions`);
+  },
+
+  // Terminate user session (Admin only)
+  terminateSession: async (userId, sessionId) => {
+    return await api.delete(`${API_ENDPOINTS.users}/${userId}/sessions/${sessionId}`);
+  },
+
+  // Terminate all other user sessions except current (Admin only)
+  terminateAllOtherSessions: async (userId) => {
+    return await api.delete(`${API_ENDPOINTS.users}/${userId}/sessions`);
+  },
 };
 
 export default userService;

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config');
+const trackSession = require('./sessionTracker');
 
 // Protect routes - verify JWT token
 exports.protect = async (req, res, next) => {
@@ -39,7 +40,9 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    next();
+    // Track session (non-blocking, don't wait for it)
+    // trackSession calls next() internally, so we don't need to call it again
+    trackSession(req, res, next);
   } catch (error) {
     return res.status(401).json({
       success: false,

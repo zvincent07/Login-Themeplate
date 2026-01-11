@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 const TopBar = ({ sidebarOpen, onToggleSidebar, breadcrumbs, notificationCount = 0 }) => {
+  // Calculate left margin based on sidebar state
+  const leftMargin = sidebarOpen ? '224px' : '64px'; // 224px = w-56 (14rem), 64px = w-16 (4rem)
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -17,7 +19,13 @@ const TopBar = ({ sidebarOpen, onToggleSidebar, breadcrumbs, notificationCount =
   }, []);
 
   return (
-    <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2.5">
+    <header 
+      className="fixed top-0 right-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2.5 z-40 transition-all duration-700 ease-in-out" 
+      style={{ 
+        left: leftMargin,
+        transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
+    >
       <div className="flex items-center justify-between">
         {/* Left Side: Toggle, Breadcrumbs */}
         <div className="flex items-center gap-3">

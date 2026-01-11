@@ -24,7 +24,7 @@ const Sidebar = ({ sidebarOpen, user, navigationItems, activeNavItem, onNavItemC
     <aside
       className={`${
         sidebarOpen ? 'w-56' : 'w-16'
-      } bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 transition-all duration-700 ease-in-out overflow-hidden overflow-x-hidden relative`}
+      } fixed left-0 top-0 h-screen bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 transition-all duration-700 ease-in-out overflow-hidden overflow-x-hidden z-50`}
       style={{
         transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
       }}

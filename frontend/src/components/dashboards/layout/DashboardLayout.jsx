@@ -37,7 +37,8 @@ const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notific
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 overflow-x-hidden">
+      {/* Fixed Sidebar */}
       <Sidebar
         sidebarOpen={sidebarOpen}
         user={user}
@@ -48,8 +49,14 @@ const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notific
         setProfileDropdownOpen={setProfileDropdownOpen}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden overflow-x-hidden">
+      {/* Main Content Area - Adjusted for fixed sidebar */}
+      <div
+        className="flex flex-col transition-all duration-700 ease-in-out"
+        style={{
+          marginLeft: sidebarOpen ? '224px' : '64px', // 224px = w-56 (14rem), 64px = w-16 (4rem)
+        }}
+      >
+        {/* Fixed Top Bar */}
         <TopBar
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -57,8 +64,8 @@ const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notific
           notificationCount={notificationCount}
         />
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-6">
+        {/* Scrollable Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-6" style={{ height: 'calc(100vh - 57px)', marginTop: '57px' }}>
           <div className="w-full">
             {children}
           </div>

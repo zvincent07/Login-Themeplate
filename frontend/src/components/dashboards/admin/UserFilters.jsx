@@ -63,7 +63,7 @@ const UserFilters = ({
             <option value="inactive">Inactive</option>
             <option value="verified">Verified</option>
             <option value="unverified">Unverified</option>
-            <option value="deleted">Deleted</option>
+            {/* <option value="deleted">Deleted</option> */}
           </select>
         </div>
 

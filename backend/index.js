@@ -30,6 +30,12 @@ if (process.env.SEED_DB === 'true' || config.nodeEnv === 'development') {
 // Initialize Express app
 const app = express();
 
+// Trust proxy configuration
+// In production behind reverse proxy (nginx, etc.), set to number of proxies (e.g., 1)
+// In development, set to false to avoid rate limiter warnings
+// For production: app.set('trust proxy', 1); // Trust first proxy
+app.set('trust proxy', config.nodeEnv === 'production' ? 1 : false);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
