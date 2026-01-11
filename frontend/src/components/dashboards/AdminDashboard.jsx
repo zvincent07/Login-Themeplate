@@ -310,7 +310,17 @@ const AdminDashboard = () => {
 
   const getBreadcrumbs = () => {
     const path = location.pathname;
-    const item = navigationItems.find(nav => nav.path === path || path.startsWith(nav.path + '/'));
+    // Check navigationItems first
+    let item = navigationItems.find(nav => nav.path === path || path.startsWith(nav.path + '/'));
+    // If not found, check navigationGroups
+    if (!item && navigationGroups && Array.isArray(navigationGroups)) {
+      for (const group of navigationGroups) {
+        if (group && group.items && Array.isArray(group.items)) {
+          item = group.items.find(nav => nav.path === path || path.startsWith(nav.path + '/'));
+          if (item) break;
+        }
+      }
+    }
     if (item) {
       return ['Home', item.label];
     }

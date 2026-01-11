@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import ProfileDropdown from './ProfileDropdown';
 
-const Sidebar = ({ sidebarOpen, user, navigationItems, activeNavItem, onNavItemClick, profileDropdownOpen, setProfileDropdownOpen }) => {
+const Sidebar = ({ sidebarOpen, user, navigationItems = [], navigationGroups = [], activeNavItem, onNavItemClick, profileDropdownOpen, setProfileDropdownOpen }) => {
   const profileButtonRef = useRef(null);
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   const getInitials = (name) => {
     if (!name) return 'A';
@@ -70,7 +71,8 @@ const Sidebar = ({ sidebarOpen, user, navigationItems, activeNavItem, onNavItemC
             </span>
           </div>
           <div className="space-y-0.5">
-            {navigationItems.map((item) => (
+            {/* Render top-level navigation items first */}
+            {Array.isArray(navigationItems) && navigationItems.length > 0 && navigationItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => onNavItemClick(item.id)}
@@ -104,6 +106,107 @@ const Sidebar = ({ sidebarOpen, user, navigationItems, activeNavItem, onNavItemC
                 </span>
               </button>
             ))}
+            
+            {/* Render grouped navigation if groups exist */}
+            {Array.isArray(navigationGroups) && navigationGroups.length > 0 && navigationGroups.map((group) => {
+              if (!group || !group.items || !Array.isArray(group.items)) {
+                return null;
+              }
+              const isExpanded = expandedGroups[group.id] ?? (group.defaultExpanded ?? true);
+              return (
+                <div key={group.id} className="mb-1">
+                  {/* Group Header */}
+                  <button
+                    onClick={() => {
+                      if (sidebarOpen) {
+                        setExpandedGroups(prev => ({
+                          ...prev,
+                          [group.id]: !isExpanded
+                        }));
+                      }
+                    }}
+                    className={`w-full flex items-center ${
+                      sidebarOpen ? 'px-2 py-1.5 gap-2' : 'px-0 py-1.5 justify-center'
+                    } rounded-md transition-colors text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50`}
+                    title={group.label}
+                  >
+                    {group.icon && (
+                      <svg
+                        className="w-4 h-4 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        {group.icon}
+                      </svg>
+                    )}
+                    <span
+                      className={`text-xs font-semibold uppercase tracking-wider flex-1 text-left transition-all duration-700 ease-in-out ${
+                        sidebarOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 overflow-hidden'
+                      }`}
+                    >
+                      {group.label}
+                    </span>
+                    {sidebarOpen && (
+                      <svg
+                        className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${
+                          isExpanded ? 'rotate-180' : ''
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                  {/* Group Items */}
+                  {isExpanded && group.items && group.items.length > 0 && (
+                    <div className={`ml-2 mt-0.5 space-y-0.5 ${sidebarOpen ? '' : 'hidden'}`}>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => onNavItemClick(item.id)}
+                          className={`w-full flex items-center ${
+                            sidebarOpen ? 'px-2 py-1.5 gap-2' : 'px-0 py-1.5 justify-center'
+                          } rounded-md transition-colors ${
+                            activeNavItem === item.id
+                              ? 'bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-slate-100'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                          }`}
+                          title={item.label}
+                        >
+                          {typeof item.icon === 'function' ? (
+                            item.icon()
+                          ) : (
+                            <svg
+                              className="w-4 h-4 flex-shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              {item.icon}
+                            </svg>
+                          )}
+                          <span
+                            className={`text-sm font-normal whitespace-nowrap transition-all duration-700 ease-in-out ${
+                              sidebarOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 overflow-hidden'
+                            }`}
+                          >
+                            {item.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </nav>
 

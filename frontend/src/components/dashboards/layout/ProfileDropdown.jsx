@@ -6,6 +6,12 @@ const ProfileDropdown = ({ user, isOpen, onClose, sidebarOpen, profileButtonRef 
   const navigate = useNavigate();
   const profileDropdownRef = useRef(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+    return 'light';
+  });
 
   useEffect(() => {
     if (isOpen && profileButtonRef.current) {
@@ -15,7 +21,7 @@ const ProfileDropdown = ({ user, isOpen, onClose, sidebarOpen, profileButtonRef 
           const viewportWidth = window.innerWidth;
           const viewportHeight = window.innerHeight;
           const dropdownWidth = 192; // w-48 = 12rem = 192px
-          const estimatedDropdownHeight = 200;
+          const estimatedDropdownHeight = 280;
           
           let left = rect.right + 8;
           
@@ -75,6 +81,24 @@ const ProfileDropdown = ({ user, isOpen, onClose, sidebarOpen, profileButtonRef 
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onClose, profileButtonRef]);
+
+  // Sync theme state with DOM changes
+  useEffect(() => {
+    const checkTheme = () => {
+      const hasDarkClass = document.documentElement.classList.contains('dark');
+      setTheme(hasDarkClass ? 'dark' : 'light');
+    };
+    
+    checkTheme();
+    
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -212,6 +236,55 @@ const ProfileDropdown = ({ user, isOpen, onClose, sidebarOpen, profileButtonRef 
           </svg>
           Activity Logs
         </button>
+
+        <div className="border-t border-gray-200 dark:border-slate-700 my-0.5"></div>
+
+        {/* Theme Toggle */}
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Theme</span>
+          </div>
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-md p-0.5">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                setTheme('light');
+              }}
+              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                theme === 'light'
+                  ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-slate-100'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              Light
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                setTheme('dark');
+              }}
+              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                theme === 'dark'
+                  ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-slate-100'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+              Dark
+            </button>
+          </div>
+        </div>
 
         <div className="border-t border-gray-200 dark:border-slate-700 my-0.5"></div>
 
