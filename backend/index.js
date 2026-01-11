@@ -6,6 +6,8 @@ const config = require('./src/config');
 const routes = require('./src/routes');
 const errorHandler = require('./src/middleware/errorHandler');
 const notFound = require('./src/middleware/notFound');
+const { apiLimiter } = require('./src/middleware/rateLimiter');
+const logger = require('./src/utils/logger');
 require('./src/config/passport');
 
 // Connect to database
@@ -18,8 +20,9 @@ if (process.env.SEED_DB === 'true' || config.nodeEnv === 'development') {
   setTimeout(async () => {
     try {
       await seedDatabase();
+      logger.info('Database seeded successfully');
     } catch (error) {
-      // Silently handle seeding errors
+      logger.error('Database seeding failed:', error);
     }
   }, 2000);
 }
@@ -32,6 +35,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
+
+// Apply rate limiting to all API routes
+app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api', routes);
@@ -50,7 +56,24 @@ app.use(errorHandler);
 
 // Start server
 const PORT = config.port;
-app.listen(PORT);
+app.listen(PORT, () => {
+  logger.info(`Server running in ${config.nodeEnv} mode on port ${PORT}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  logger.error('Unhandled Promise Rejection:', err);
+  // Close server & exit process
+  // app.close(() => {
+  //   process.exit(1);
+  // });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+  process.exit(1);
+});
 
 module.exports = app;
 

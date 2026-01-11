@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import userService from '../../../services/userService';
 import Toast from '../../ui/Toast';
+import UserStats from './UserStats';
+import UserFilters from './UserFilters';
+import { SEARCH_DEBOUNCE_MS, MAX_EXPORT_LIMIT } from '../../../constants';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -52,8 +55,11 @@ const Users = () => {
     unverified: 0,
   });
 
+  // AbortController ref for canceling in-flight requests
+  const abortControllerRef = useRef(null);
+
   // Fetch users with pagination and filters (server-side filtering)
-  const fetchUsers = useCallback(async (page = 1) => {
+  const fetchUsers = useCallback(async (page = 1, signal = null) => {
     try {
       setLoading(true);
       setError(null);
@@ -65,6 +71,12 @@ const Users = () => {
         sortBy: sortBy,
         sortOrder: sortOrder,
       });
+      
+      // Check if request was aborted
+      if (signal?.aborted) {
+        return;
+      }
+      
       if (response.success) {
         setUsers(response.data || []);
         if (response.pagination) {
@@ -75,9 +87,15 @@ const Users = () => {
         setError(response.error || 'Failed to fetch users');
       }
     } catch (err) {
+      // Don't set error if request was aborted
+      if (signal?.aborted) {
+        return;
+      }
       setError(err.message || 'Failed to fetch users');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [itemsPerPage, searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
 
@@ -95,11 +113,26 @@ const Users = () => {
 
   // Fetch users when page or filters change (with debounce for search)
   useEffect(() => {
+    // Cancel previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     const timeoutId = setTimeout(() => {
-      fetchUsers(currentPage);
-    }, searchTerm ? 300 : 0); // Debounce search by 300ms
+      fetchUsers(currentPage, abortController.signal);
+    }, searchTerm ? SEARCH_DEBOUNCE_MS : 0);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      // Abort request on cleanup
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [currentPage, fetchUsers, searchTerm]);
 
   // Reset to page 1 when filters change
@@ -381,7 +414,7 @@ const Users = () => {
       // If no users provided, fetch all users matching current filters
       if (!users) {
         // Fetch with a high limit to get all users (or use multiple requests if needed)
-        const response = await userService.getUsers(1, 10000, {
+        const response = await userService.getUsers(1, MAX_EXPORT_LIMIT, {
           search: searchTerm,
           role: roleFilter,
           status: statusFilter,
@@ -395,7 +428,7 @@ const Users = () => {
           users = Array.isArray(response.data) ? response.data : [];
           
           // If we got the max limit, warn user that there might be more users
-          if (users.length === 10000 && response.pagination && response.pagination.total > 10000) {
+          if (users.length === MAX_EXPORT_LIMIT && response.pagination && response.pagination.total > MAX_EXPORT_LIMIT) {
             setToast({
               message: `Exported first 10,000 users. Total users: ${response.pagination.total}. Consider using filters to export specific users.`,
               type: 'info',
@@ -665,47 +698,7 @@ const Users = () => {
       </div>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 border border-gray-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.total}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 border border-gray-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Active Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.active}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 border border-gray-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Unverified</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.unverified}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
+      <UserStats stats={stats} loading={loading} />
 
       {error && (
         <div className="mb-3 p-2.5 text-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
@@ -756,110 +749,20 @@ const Users = () => {
         </div>
       ) : (
         /* Filters - Shows when no users are selected */
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            {/* Search */}
-            <div className="sm:col-span-2 lg:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Search
-              </label>
-              <input
-                type="text"
-                placeholder="Search by email, name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-              />
-            </div>
-
-            {/* Role Filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Role
-              </label>
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="w-full px-2.5 py-1.5 h-[32px] text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-              >
-                <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="employee">Employee</option>
-                <option value="user">User</option>
-              </select>
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Status
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-2.5 py-1.5 h-[32px] text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="verified">Verified</option>
-                <option value="unverified">Unverified</option>
-                <option value="deleted">Deleted</option>
-              </select>
-            </div>
-
-            {/* Provider Filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Provider
-              </label>
-              <select
-                value={providerFilter}
-                onChange={(e) => setProviderFilter(e.target.value)}
-                className="w-full px-2.5 py-1.5 h-[32px] text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-              >
-                <option value="all">All Providers</option>
-                <option value="local">Local</option>
-                <option value="google">Google</option>
-              </select>
-            </div>
-
-            {/* Sort By */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sort By
-              </label>
-              <div className="flex gap-1">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 h-[32px] text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                >
-                  <option value="createdAt">Created Date</option>
-                  <option value="firstName">First Name</option>
-                  <option value="lastName">Last Name</option>
-                  <option value="email">Email</option>
-                  <option value="lastLogin">Last Login</option>
-                </select>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="px-2 py-1.5 h-[32px] border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600"
-                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-                >
-                  {sortOrder === 'asc' ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UserFilters
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          roleFilter={roleFilter}
+          setRoleFilter={setRoleFilter}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          providerFilter={providerFilter}
+          setProviderFilter={setProviderFilter}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          sortOrder={sortOrder}
+          setSortOrder={setSortOrder}
+        />
       )}
 
       {/* Users Table */}

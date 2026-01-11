@@ -15,14 +15,22 @@ const {
 const { protect } = require('../middleware/auth');
 const { optionalAuth } = require('../middleware/optionalAuth');
 const botDetection = require('../middleware/botDetection');
+const { authLimiter, passwordResetLimiter, otpLimiter } = require('../middleware/rateLimiter');
+const {
+  validateRegister,
+  validateLogin,
+  validateOTP,
+  validatePasswordReset,
+  validateForgotPassword,
+} = require('../middleware/validator');
 
-// Public routes (with bot detection)
-router.post('/register', botDetection, register);
-router.post('/login', botDetection, login);
-router.post('/verify-otp', verifyOTP);
-router.post('/resend-otp', resendOTP);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+// Public routes (with bot detection, rate limiting, and validation)
+router.post('/register', authLimiter, botDetection, validateRegister, register);
+router.post('/login', authLimiter, botDetection, validateLogin, login);
+router.post('/verify-otp', otpLimiter, validateOTP, verifyOTP);
+router.post('/resend-otp', otpLimiter, resendOTP);
+router.post('/forgot-password', passwordResetLimiter, validateForgotPassword, forgotPassword);
+router.post('/reset-password', passwordResetLimiter, validatePasswordReset, resetPassword);
 // Logout works even with expired tokens
 router.post('/logout', optionalAuth, logout);
 

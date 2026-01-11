@@ -90,10 +90,16 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Indexes
+// Indexes for performance optimization
 // Note: email index is automatically created by unique: true
 // Note: googleId index is automatically created by unique: true + sparse: true
 userSchema.index({ roleName: 1 });
+userSchema.index({ isActive: 1, deletedAt: 1 }); // Compound index for active users query
+userSchema.index({ isEmailVerified: 1, deletedAt: 1 }); // Compound index for verified users query
+userSchema.index({ createdAt: -1 }); // For sorting by creation date
+userSchema.index({ deletedAt: 1 }); // For soft delete queries
+userSchema.index({ email: 1, deletedAt: 1 }); // Compound index for email search with soft delete
+userSchema.index({ roleName: 1, isActive: 1, deletedAt: 1 }); // Compound index for role + status queries
 
 // Hash password before saving
 userSchema.pre('save', async function () {

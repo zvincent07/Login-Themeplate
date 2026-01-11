@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const Permission = require('../models/Permission');
 const bcrypt = require('bcryptjs');
+const logger = require('./logger');
 
 const seedDatabase = async () => {
   try {
@@ -81,8 +82,9 @@ const seedDatabase = async () => {
       });
     }
 
-    // Seeding completed silently
+    logger.info('Database seeding completed successfully');
   } catch (error) {
+    logger.error('Database seeding error:', error);
     throw error;
   }
 };
