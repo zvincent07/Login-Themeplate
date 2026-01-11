@@ -10,7 +10,7 @@ const bannedIPSchema = new mongoose.Schema(
     reason: {
       type: String,
       required: true,
-      enum: ['bot_detection', 'suspicious_activity', 'manual_ban'],
+      enum: ['bot_detection', 'suspicious_activity', 'manual_ban', 'failed_admin_login'],
       default: 'bot_detection',
     },
     bannedAt: {
@@ -50,14 +50,14 @@ bannedIPSchema.statics.isBanned = async function(ip) {
 };
 
 // Method to ban an IP
-bannedIPSchema.statics.banIP = async function(ip, reason, movementData = null) {
+bannedIPSchema.statics.banIP = async function(ip, reason, movementData = null, banDurationHours = 24) {
   const existing = await this.findOne({ ip });
   
   if (existing) {
     // Update existing ban
     existing.reason = reason;
     existing.bannedAt = new Date();
-    existing.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    existing.expiresAt = new Date(Date.now() + banDurationHours * 60 * 60 * 1000);
     existing.attempts += 1;
     if (movementData) {
       existing.movementData = movementData;
@@ -71,6 +71,7 @@ bannedIPSchema.statics.banIP = async function(ip, reason, movementData = null) {
     reason,
     movementData,
     attempts: 1,
+    expiresAt: new Date(Date.now() + banDurationHours * 60 * 60 * 1000),
   });
 };
 

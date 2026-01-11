@@ -14,7 +14,6 @@ const Register = () => {
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: '',
   });
   const [otp, setOtp] = useState('');
   const [userId, setUserId] = useState(null);
@@ -22,10 +21,11 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touchedFields, setTouchedFields] = useState({});
   const cursorTrackerRef = useRef(null);
 
-  const { firstName, lastName, email, password, confirmPassword } = formData;
+  const { firstName, lastName, email, password } = formData;
 
   const passwordRequirements = getPasswordRequirements();
 
@@ -51,10 +51,50 @@ const Register = () => {
     }));
     setError('');
 
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+
     // Check password strength in real-time
     if (name === 'password') {
       setPasswordStrength(checkPasswordStrength(value));
     }
+  };
+
+  const onBlur = (e) => {
+    const { name, value } = e.target;
+    setTouchedFields((prev) => ({ ...prev, [name]: true }));
+
+    // Validate on blur
+    const errors = { ...fieldErrors };
+    
+    if (name === 'email' && value) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        errors.email = 'Please enter a valid email address';
+      } else {
+        delete errors.email;
+      }
+    }
+
+    if (name === 'firstName' && !value.trim()) {
+      errors.firstName = 'First name is required';
+    } else if (name === 'firstName') {
+      delete errors.firstName;
+    }
+
+    if (name === 'lastName' && !value.trim()) {
+      errors.lastName = 'Last name is required';
+    } else if (name === 'lastName') {
+      delete errors.lastName;
+    }
+
+    setFieldErrors(errors);
   };
 
   const onOtpChange = (e) => {
@@ -67,8 +107,32 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    // Mark all fields as touched
+    setTouchedFields({
+      firstName: true,
+      lastName: true,
+      email: true,
+      password: true,
+    });
+
+    // Validate all fields
+    const errors = {};
+    if (!firstName.trim()) errors.firstName = 'First name is required';
+    if (!lastName.trim()) errors.lastName = 'Last name is required';
+    if (!email.trim()) {
+      errors.email = 'Email is required';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errors.email = 'Please enter a valid email address';
+      }
+    }
+    if (!password) {
+      errors.password = 'Password is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
@@ -266,29 +330,73 @@ const Register = () => {
                     <Label htmlFor="firstName" required>
                       First name
                     </Label>
-                    <Input
-                      type="text"
-                      id="firstName"
-                      name="firstName"
-                      value={firstName}
-                      onChange={onChange}
-                      required
-                      placeholder="John"
-                    />
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                          />
+                        </svg>
+                      </div>
+                      <Input
+                        type="text"
+                        id="firstName"
+                        name="firstName"
+                        value={firstName}
+                        onChange={onChange}
+                        onBlur={onBlur}
+                        required
+                        placeholder="John"
+                        className={`pl-9 ${touchedFields.firstName && fieldErrors.firstName ? 'border-red-500 dark:border-red-500' : ''}`}
+                      />
+                    </div>
+                    {touchedFields.firstName && fieldErrors.firstName && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="lastName" required>
                       Last name
                     </Label>
-                    <Input
-                      type="text"
-                      id="lastName"
-                      name="lastName"
-                      value={lastName}
-                      onChange={onChange}
-                      required
-                      placeholder="Doe"
-                    />
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                          />
+                        </svg>
+                      </div>
+                      <Input
+                        type="text"
+                        id="lastName"
+                        name="lastName"
+                        value={lastName}
+                        onChange={onChange}
+                        onBlur={onBlur}
+                        required
+                        placeholder="Doe"
+                        className={`pl-9 ${touchedFields.lastName && fieldErrors.lastName ? 'border-red-500 dark:border-red-500' : ''}`}
+                      />
+                    </div>
+                    {touchedFields.lastName && fieldErrors.lastName && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
+                    )}
                   </div>
                 </div>
 
@@ -296,15 +404,37 @@ const Register = () => {
                   <Label htmlFor="email" required>
                     Email
                   </Label>
-                  <Input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={email}
-                    onChange={onChange}
-                    required
-                    placeholder="you@example.com"
-                  />
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                    <Input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={email}
+                      onChange={onChange}
+                      onBlur={onBlur}
+                      required
+                      placeholder="you@example.com"
+                      className={`pl-9 ${touchedFields.email && fieldErrors.email ? 'border-red-500 dark:border-red-500' : ''}`}
+                    />
+                  </div>
+                  {touchedFields.email && fieldErrors.email && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -312,15 +442,31 @@ const Register = () => {
                     Password
                   </Label>
                   <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                    </div>
                     <Input
                       type={showPassword ? 'text' : 'password'}
                       id="password"
                       name="password"
                       value={password}
                       onChange={onChange}
+                      onBlur={onBlur}
                       required
                       placeholder="••••••••"
-                      className="pr-9"
+                      className={`pl-9 pr-9 ${touchedFields.password && fieldErrors.password ? 'border-red-500 dark:border-red-500' : ''}`}
                     />
                     <button
                       type="button"
@@ -364,8 +510,11 @@ const Register = () => {
                       )}
                     </button>
                   </div>
+                  {touchedFields.password && fieldErrors.password && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
+                  )}
                   
-                  {/* Password Requirements - Modern Grid Design */}
+                  {/* Password Requirements - Interactive with Green Checkmarks */}
                   {password && (
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -374,20 +523,34 @@ const Register = () => {
                           return (
                             <div 
                               key={req.key} 
-                              className={`flex items-center gap-1.5 text-xs transition-all ${
+                              className={`flex items-center gap-2 text-xs transition-all duration-200 ${
                                 isMet 
                                   ? 'opacity-100' 
-                                  : 'opacity-50'
+                                  : 'opacity-60'
                               }`}
                             >
-                              <div className={`flex-shrink-0 w-1.5 h-1.5 rounded-full transition-all ${
+                              {isMet ? (
+                                <svg
+                                  className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2.5}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                              ) : (
+                                <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600" />
+                                </div>
+                              )}
+                              <span className={`text-xs transition-colors ${
                                 isMet 
-                                  ? 'bg-black dark:bg-white' 
-                                  : 'bg-gray-300 dark:bg-gray-600'
-                              }`} />
-                              <span className={`text-xs ${
-                                isMet 
-                                  ? 'text-gray-900 dark:text-gray-200' 
+                                  ? 'text-green-700 dark:text-green-400 font-medium' 
                                   : 'text-gray-500 dark:text-gray-500'
                               }`}>
                                 {req.text}
@@ -397,68 +560,6 @@ const Register = () => {
                         })}
                       </div>
                     </div>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="confirmPassword" required>
-                    Confirm password
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      value={confirmPassword}
-                      onChange={onChange}
-                      required
-                      placeholder="••••••••"
-                      className="pr-9"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                    >
-                      {showConfirmPassword ? (
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m0 0A9.97 9.97 0 015.12 5.12m3.17 3.17L12 12m-3.71-3.71L5.12 5.12M12 12l3.71 3.71M12 12l-3.71-3.71m7.42 7.42L18.88 18.88A9.97 9.97 0 0019 12a9.97 9.97 0 00-.12-1.88m-3.17 3.17L12 12m3.71 3.71L18.88 18.88"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  {confirmPassword && password !== confirmPassword && (
-                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">Passwords do not match</p>
                   )}
                 </div>
 
@@ -532,7 +633,7 @@ const Register = () => {
             </div>
           </div>
 
-        {/* Right Side - Welcome Section */}
+        {/* Right Side - Marketing Panel */}
         <div className="w-full bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center p-4 sm:p-6 order-1 md:order-2 hidden md:flex">
           <div className="text-center max-w-md">
             <div className="w-24 h-24 md:w-32 md:h-32 mb-6 mx-auto">
@@ -559,14 +660,79 @@ const Register = () => {
               </svg>
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3">
-              Join us today
+              Start building faster
             </h2>
-            <p className="text-base md:text-lg text-slate-700 dark:text-slate-300 mb-2">
-              Create your account
+            <p className="text-base md:text-lg text-slate-700 dark:text-slate-300 mb-4">
+              Join 10,000+ developers managing their users with ease
             </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Start your journey with us and unlock amazing features
-            </p>
+            
+            {/* Benefits Checklist */}
+            <div className="space-y-3 text-left max-w-xs mx-auto">
+              <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <svg
+                  className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>Free forever</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <svg
+                  className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>No credit card required</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <svg
+                  className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>Industry-standard security</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <svg
+                  className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>Get started in minutes</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

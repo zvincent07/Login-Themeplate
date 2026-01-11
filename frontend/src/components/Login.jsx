@@ -5,6 +5,83 @@ import { Input, Button, Label, Checkbox } from './ui';
 import ThemeToggle from './ThemeToggle';
 import Chatbot from './Chatbot';
 import CursorTracker from '../utils/cursorTracker';
+import Toast from './ui/Toast';
+
+// Dynamic Welcome Panel Component
+const DynamicWelcomePanel = () => {
+  const [greeting, setGreeting] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    
+    if (hour >= 5 && hour < 12) {
+      setGreeting("Good Morning!");
+      setSubtitle("Ready to manage the system?");
+    } else if (hour >= 12 && hour < 17) {
+      setGreeting("Good Afternoon!");
+      setSubtitle("Manage users, track sessions, and secure your platform in one place.");
+    } else if (hour >= 17 && hour < 22) {
+      setGreeting("Good Evening!");
+      setSubtitle("Manage users, track sessions, and secure your platform in one place.");
+    } else {
+      setGreeting("Working Late?");
+      setSubtitle("Don't forget to enable Dark Mode for a better experience.");
+    }
+  }, []);
+
+  return (
+    <div className="text-center max-w-md">
+      <div className="w-24 h-24 md:w-32 md:h-32 mb-6 mx-auto">
+        <svg
+          viewBox="0 0 200 200"
+          className="w-full h-full text-slate-700 dark:text-slate-300"
+          fill="none"
+          stroke="currentColor"
+        >
+          <circle
+            cx="100"
+            cy="100"
+            r="80"
+            strokeWidth="1.5"
+            className="opacity-20"
+          />
+          <path
+            d="M100 40 L100 60 M100 140 L100 160 M40 100 L60 100 M140 100 L160 100"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <circle cx="100" cy="100" r="30" strokeWidth="1.5" />
+          <circle cx="100" cy="100" r="8" fill="currentColor" />
+        </svg>
+      </div>
+      <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3">
+        {greeting || 'Welcome back'}
+      </h2>
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <svg
+          className="w-5 h-5 text-slate-600 dark:text-slate-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+          />
+        </svg>
+        <p className="text-base md:text-lg text-slate-700 dark:text-slate-300">
+          Secure Access
+        </p>
+      </div>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        {subtitle || 'Your data is protected with industry-standard security'}
+      </p>
+    </div>
+  );
+};
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,6 +93,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [toast, setToast] = useState(null);
   const cursorTrackerRef = useRef(null);
 
   const { email, password } = formData;
@@ -57,7 +135,13 @@ const Login = () => {
         }
       }
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
+      const errorMessage = err.message || 'Login failed. Please try again.';
+      setError(errorMessage);
+      // Show toast notification
+      setToast({
+        message: errorMessage,
+        type: 'error',
+      });
       // Restart cursor tracking on error
       if (cursorTrackerRef.current) {
         cursorTrackerRef.current.startTracking();
@@ -72,7 +156,12 @@ const Login = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const oauthError = urlParams.get('error');
     if (oauthError) {
-      setError('Google authentication failed. Please try again.');
+      const errorMessage = 'Google authentication failed. Please try again.';
+      setError(errorMessage);
+      setToast({
+        message: errorMessage,
+        type: 'error',
+      });
       // Clear the error from URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -118,26 +207,39 @@ const Login = () => {
                 </p>
               </div>
 
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-md">
-                  <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-                </div>
-              )}
 
               <form onSubmit={onSubmit} className="space-y-4">
                 <div>
                   <Label htmlFor="email" required>
                     Email
                   </Label>
-                  <Input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={email}
-                    onChange={onChange}
-                    required
-                    placeholder="you@example.com"
-                  />
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                    <Input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={email}
+                      onChange={onChange}
+                      required
+                      placeholder="you@example.com"
+                      className="pl-9"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -145,6 +247,21 @@ const Login = () => {
                     Password
                   </Label>
                   <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                    </div>
                     <Input
                       type={showPassword ? 'text' : 'password'}
                       id="password"
@@ -153,7 +270,7 @@ const Login = () => {
                       onChange={onChange}
                       required
                       placeholder="••••••••"
-                      className="pr-9"
+                      className="pl-9 pr-9"
                     />
                     <button
                       type="button"
@@ -283,47 +400,23 @@ const Login = () => {
             </div>
           </div>
 
-        {/* Right Side - Welcome Section */}
+        {/* Right Side - Welcome Section with Dynamic Greetings */}
         <div className="w-full bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center p-4 sm:p-6 order-1 md:order-2 hidden md:flex">
-          <div className="text-center max-w-md">
-            <div className="w-24 h-24 md:w-32 md:h-32 mb-6 mx-auto">
-              <svg
-                viewBox="0 0 200 200"
-                className="w-full h-full text-slate-700 dark:text-slate-300"
-                fill="none"
-                stroke="currentColor"
-              >
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  strokeWidth="1.5"
-                  className="opacity-20"
-                />
-                <path
-                  d="M100 40 L100 60 M100 140 L100 160 M40 100 L60 100 M140 100 L160 100"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <circle cx="100" cy="100" r="30" strokeWidth="1.5" />
-                <circle cx="100" cy="100" r="8" fill="currentColor" />
-              </svg>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3">
-              Welcome back
-            </h2>
-            <p className="text-base md:text-lg text-slate-700 dark:text-slate-300 mb-2">
-              Secure Access
-            </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Your data is protected with industry-standard security
-            </p>
-          </div>
+          <DynamicWelcomePanel />
         </div>
       </div>
 
       {/* Chatbot */}
       <Chatbot />
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

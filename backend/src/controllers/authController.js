@@ -226,6 +226,8 @@ exports.resendOTP = asyncHandler(async (req, res) => {
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
   const { email, password, rememberMe } = req.body;
+  const BannedIP = require('../models/BannedIP');
+  const LoginAttempt = require('../models/LoginAttempt');
 
   // Validate email & password
   if (!email || !password) {
@@ -234,6 +236,31 @@ exports.login = asyncHandler(async (req, res) => {
       error: 'Please provide email and password',
     });
   }
+
+  // Get IP address
+  const ip =
+    req.ip ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.headers['x-real-ip'] ||
+    'unknown';
+
+  // Check if IP is banned
+  const isBanned = await BannedIP.isBanned(ip);
+  if (isBanned) {
+    return res.status(403).json({
+      success: false,
+      error: 'Your IP address has been temporarily banned due to suspicious activity. Please try again later.',
+    });
+  }
+
+  // Check if email is admin email (case-insensitive check for common admin patterns)
+  const adminEmailPatterns = [
+    /^admin@/i,
+    /administrator@/i,
+  ];
+  const isAdminEmail = adminEmailPatterns.some(pattern => pattern.test(email));
 
   // Note: Bot detection is handled by botDetection middleware
   // Movement data is analyzed there and IP is banned if bot-like behavior is detected
@@ -246,6 +273,27 @@ exports.login = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
+    // Record failed attempt for admin emails
+    if (isAdminEmail) {
+      const attempt = await LoginAttempt.recordFailedAttempt(ip, email, true);
+      const attemptCount = attempt.attempts;
+      
+      // Ban IP after 5 failed attempts for admin email
+      if (attemptCount >= 5) {
+        await BannedIP.banIP(ip, 'failed_admin_login', null, 1); // Ban for 1 hour
+        return res.status(403).json({
+          success: false,
+          error: 'Too many failed login attempts. Your IP has been temporarily banned for 1 hour.',
+        });
+      }
+      
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+        remainingAttempts: Math.max(0, 5 - attemptCount),
+      });
+    }
+    
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials',
@@ -263,11 +311,35 @@ exports.login = asyncHandler(async (req, res) => {
   // Verify password
   const isPasswordValid = await user.matchPassword(password);
   if (!isPasswordValid) {
+    // Record failed attempt for admin emails
+    if (isAdminEmail) {
+      const attempt = await LoginAttempt.recordFailedAttempt(ip, email, true);
+      const attemptCount = attempt.attempts;
+      
+      // Ban IP after 5 failed attempts for admin email
+      if (attemptCount >= 5) {
+        await BannedIP.banIP(ip, 'failed_admin_login', null, 1); // Ban for 1 hour
+        return res.status(403).json({
+          success: false,
+          error: 'Too many failed login attempts. Your IP has been temporarily banned for 1 hour.',
+        });
+      }
+      
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+        remainingAttempts: Math.max(0, 5 - attemptCount),
+      });
+    }
+    
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials',
     });
   }
+
+  // Reset failed attempts on successful login
+  await LoginAttempt.resetAttempts(ip, email);
 
   if (!user.isActive) {
     return res.status(401).json({
@@ -309,14 +381,7 @@ exports.login = asyncHandler(async (req, res) => {
   const Session = require('../models/Session');
   const { getIPGeolocation, parseUserAgent } = require('../utils/ipGeolocation');
   
-  const ip =
-    req.ip ||
-    req.connection?.remoteAddress ||
-    req.socket?.remoteAddress ||
-    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.headers['x-real-ip'] ||
-    'unknown';
-  
+  // IP address already extracted above
   const userAgent = req.headers['user-agent'] || '';
   const { platform, browser, device } = parseUserAgent(userAgent);
   
