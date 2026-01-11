@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 
-const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notificationCount = 0 }) => {
+const DashboardLayout = ({ user, navigationItems, navigationGroups, breadcrumbs, children, notificationCount = 0 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -12,14 +12,34 @@ const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notific
   // Determine active nav item based on current route
   const getActiveNavItem = () => {
     const currentPath = location.pathname;
-    const activeItem = navigationItems.find(item => {
-      if (item.path) {
-        // Handle exact match or path starts with the item path
-        return currentPath === item.path || currentPath.startsWith(item.path + '/');
+
+    // Check flat items
+    if (navigationItems) {
+      const activeItem = navigationItems.find(item => {
+        if (item.path) {
+          return currentPath === item.path || currentPath.startsWith(item.path + '/');
+        }
+        return false;
+      });
+      if (activeItem) return activeItem.id;
+    }
+
+    // Check groups
+    if (navigationGroups) {
+      for (const group of navigationGroups) {
+        if (group.items) {
+          const activeItem = group.items.find(item => {
+            if (item.path) {
+              return currentPath === item.path || currentPath.startsWith(item.path + '/');
+            }
+            return false;
+          });
+          if (activeItem) return activeItem.id;
+        }
       }
-      return false;
-    });
-    return activeItem?.id || navigationItems[0]?.id || '';
+    }
+
+    return navigationItems?.[0]?.id || navigationGroups?.[0]?.items?.[0]?.id || '';
   };
 
   const [activeNavItem, setActiveNavItem] = useState(getActiveNavItem());
@@ -29,7 +49,23 @@ const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notific
   }, [location.pathname]);
 
   const handleNavItemClick = (itemId) => {
-    const item = navigationItems.find(nav => nav.id === itemId);
+    let item = null;
+
+    // Search in flat items
+    if (navigationItems) {
+      item = navigationItems.find(nav => nav.id === itemId);
+    }
+
+    // Search in groups if not found
+    if (!item && navigationGroups) {
+      for (const group of navigationGroups) {
+        if (group.items) {
+          item = group.items.find(nav => nav.id === itemId);
+          if (item) break;
+        }
+      }
+    }
+
     if (item?.path) {
       navigate(item.path);
     }
@@ -43,8 +79,10 @@ const DashboardLayout = ({ user, navigationItems, breadcrumbs, children, notific
         sidebarOpen={sidebarOpen}
         user={user}
         navigationItems={navigationItems}
+        navigationGroups={navigationGroups}
         activeNavItem={activeNavItem}
         onNavItemClick={handleNavItemClick}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         profileDropdownOpen={profileDropdownOpen}
         setProfileDropdownOpen={setProfileDropdownOpen}
       />
