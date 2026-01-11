@@ -58,7 +58,7 @@ cd backend
 cp .env.example .env
 
 # Edit .env with your configuration
-# See SETUP_GUIDE.md for detailed instructions
+# See [docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md) for detailed instructions
 
 # Install dependencies
 npm install
@@ -92,10 +92,10 @@ Frontend runs on `http://localhost:3000`
 ## 📖 Setup Guides
 
 ### Google OAuth Setup
-See [SETUP_GUIDE.md](./SETUP_GUIDE.md#google-oauth-setup) for step-by-step instructions.
+See [docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md#google-oauth-setup) for step-by-step instructions.
 
 ### Email OTP Setup
-See [SETUP_GUIDE.md](./SETUP_GUIDE.md#email-otp-setup) for step-by-step instructions.
+See [docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md#email-otp-setup) for step-by-step instructions.
 
 
 ## 🔐 Default Admin Account
@@ -198,7 +198,11 @@ VITE_API_BASE_URL=http://localhost:5000/api
 
 ## 📚 Documentation
 
-- [SETUP_GUIDE.md](./SETUP_GUIDE.md) - Detailed setup instructions for Google OAuth and Email OTP
+- [docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md) - Detailed setup instructions for Google OAuth and Email OTP
+- [docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md) - Testing setup and best practices
+- [docs/TYPESCRIPT_MIGRATION.md](./docs/TYPESCRIPT_MIGRATION.md) - TypeScript migration guide
+- [docs/IMPROVEMENTS.md](./docs/IMPROVEMENTS.md) - Code improvements summary
+- [docs/PROJECT_ANALYSIS.md](./docs/PROJECT_ANALYSIS.md) - Comprehensive project analysis
 - [backend/README.md](./backend/README.md) - Backend API documentation
 - [frontend/README.md](./frontend/README.md) - Frontend documentation
 
