@@ -61,7 +61,14 @@ exports.authorize = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.roleName)) {
+    const userRole = req.user.roleName?.toLowerCase();
+    const allowedRoles = roles.map(r => r.toLowerCase());
+    
+    // 'admin' authorization also includes 'super admin'
+    const isAuthorized = allowedRoles.includes(userRole) || 
+      (allowedRoles.includes('admin') && userRole === 'super admin');
+
+    if (!isAuthorized) {
       return res.status(403).json({
         success: false,
         error: `User role '${req.user.roleName}' is not authorized to access this route`,

@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
   auth: '/auth',
   users: '/users',
   chatbot: '/chatbot',
+  roles: '/roles',
 };
 
 export default API_BASE_URL;

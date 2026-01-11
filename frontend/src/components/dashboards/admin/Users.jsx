@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import userService from '../../../services/userService';
 import authService from '../../../services/authService';
+import roleService from '../../../services/roleService';
 import Toast from '../../ui/Toast';
 import UserStats from './UserStats';
 import UserFilters from './UserFilters';
@@ -98,6 +99,8 @@ const Users = () => {
   const [openDropdown, setOpenDropdown] = useState(null); // Track which user's dropdown is open
   const [dropdownPosition, setDropdownPosition] = useState({}); // Track dropdown positions (top/bottom)
   const [selectedUsers, setSelectedUsers] = useState([]); // Track selected users for bulk actions
+  const [roles, setRoles] = useState([]); // Available roles from RBAC
+  const [loadingRoles, setLoadingRoles] = useState(false);
 
   // Clear selection when filters change (to prevent selecting users from different filter sets)
   useEffect(() => {
@@ -122,6 +125,30 @@ const Users = () => {
       }
     };
     fetchCurrentUser();
+  }, []);
+
+  // Fetch roles from RBAC system
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        setLoadingRoles(true);
+        const response = await roleService.getRoles();
+        if (response.success && response.data) {
+          // Sort roles by name for consistent display
+          const sortedRoles = [...response.data].sort((a, b) => 
+            a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+          );
+          setRoles(sortedRoles);
+        }
+      } catch (error) {
+        console.error('Failed to fetch roles:', error);
+        // Fallback to empty array - will show loading state
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    fetchRoles();
   }, []);
 
   // Prevent modals from opening for current user - runs immediately when modal state changes
@@ -1654,11 +1681,20 @@ const Users = () => {
                       onChange={(e) =>
                         management.setFormData({ ...management.formData, roleName: e.target.value })
                       }
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                      disabled={loadingRoles}
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <option value="user">User</option>
-                      <option value="employee">Employee</option>
-                      <option value="admin">Admin</option>
+                      {loadingRoles ? (
+                        <option value="">Loading roles...</option>
+                      ) : roles.length === 0 ? (
+                        <option value="">No roles available</option>
+                      ) : (
+                        roles.map((role) => (
+                          <option key={role._id || role.id} value={role.name}>
+                            {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 
@@ -1844,22 +1880,31 @@ const Users = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Role *
-                    </label>
-                    <select
-                      value={management.formData.roleName}
-                      onChange={(e) =>
-                        management.setFormData({ ...management.formData, roleName: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    >
-                      <option value="user">User</option>
-                      <option value="employee">Employee</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Role *
+                      </label>
+                      <select
+                        value={management.formData.roleName}
+                        onChange={(e) =>
+                          management.setFormData({ ...management.formData, roleName: e.target.value })
+                        }
+                        disabled={loadingRoles}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingRoles ? (
+                          <option value="">Loading roles...</option>
+                        ) : roles.length === 0 ? (
+                          <option value="">No roles available</option>
+                        ) : (
+                          roles.map((role) => (
+                            <option key={role._id || role.id} value={role.name}>
+                              {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center">

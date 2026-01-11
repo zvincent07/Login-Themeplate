@@ -22,17 +22,10 @@ exports.createEmployee = asyncHandler(async (req, res) => {
     });
   }
 
-  // Validate role
-  const validRoles = ['admin', 'employee', 'user'];
-  if (!validRoles.includes(roleName)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid role. Must be admin, employee, or user.',
-    });
-  }
-
-  // Get role
-  const role = await Role.findOne({ name: roleName });
+  // Get role (case-insensitive search)
+  const role = await Role.findOne({
+    name: { $regex: new RegExp(`^${roleName}$`, 'i') },
+  });
 
   if (!role) {
     return res.status(500).json({

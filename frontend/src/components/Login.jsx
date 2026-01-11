@@ -6,6 +6,7 @@ import ThemeToggle from './ThemeToggle';
 import Chatbot from './Chatbot';
 import CursorTracker from '../utils/cursorTracker';
 import Toast from './ui/Toast';
+import { isAdmin } from '../utils/roleHelpers';
 
 // Dynamic Welcome Panel Component
 const DynamicWelcomePanel = () => {
@@ -126,7 +127,7 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         const role = response.data.user?.roleName || 'user';
-        if (role === 'admin') {
+        if (isAdmin(role)) {
           navigate('/admin/dashboard');
         } else if (role === 'employee') {
           navigate('/employee/dashboard');

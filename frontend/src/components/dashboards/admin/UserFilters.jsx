@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import roleService from '../../../services/roleService';
 
 const UserFilters = ({
   searchTerm,
@@ -14,6 +15,33 @@ const UserFilters = ({
   sortOrder,
   setSortOrder,
 }) => {
+  const [roles, setRoles] = useState([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+
+  // Fetch roles dynamically
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        setLoadingRoles(true);
+        const response = await roleService.getRoles();
+        if (response.success && response.data) {
+          // Sort roles by name for consistent display
+          const sortedRoles = [...response.data].sort((a, b) => 
+            a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+          );
+          setRoles(sortedRoles);
+        }
+      } catch (error) {
+        console.error('Failed to fetch roles:', error);
+        // Fallback to empty array - filter will still work with "all"
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    fetchRoles();
+  }, []);
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700 mb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
@@ -39,12 +67,19 @@ const UserFilters = ({
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            disabled={loadingRoles}
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="all">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="employee">Employee</option>
-            <option value="user">User</option>
+            {loadingRoles ? (
+              <option value="">Loading roles...</option>
+            ) : (
+              roles.map((role) => (
+                <option key={role._id || role.id} value={role.name}>
+                  {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                </option>
+              ))
+            )}
           </select>
         </div>
 

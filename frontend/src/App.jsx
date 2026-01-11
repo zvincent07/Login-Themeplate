@@ -11,6 +11,7 @@ import UserDashboard from './components/dashboards/UserDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
 import EmployeeDashboard from './components/dashboards/EmployeeDashboard';
 import authService from './services/authService';
+import { isAdmin } from './utils/roleHelpers';
 
 function App() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ function App() {
             const role = response.data.user?.roleName || 'user';
             // Clear URL params
             window.history.replaceState({}, document.title, '/');
-            if (role === 'admin') {
+            if (isAdmin(role)) {
               navigate('/admin/dashboard', { replace: true });
             } else if (role === 'employee') {
               navigate('/employee/dashboard', { replace: true });
@@ -104,8 +105,8 @@ function App() {
     if (storedUser) {
       const role = storedUser.roleName || 'user';
       
-      // Allow admin to access any /admin/* route
-      if (role === 'admin' && path.startsWith('/admin')) {
+      // Allow admin (super admin or admin) to access any /admin/* route
+      if (isAdmin(role) && path.startsWith('/admin')) {
         return;
       }
       
@@ -125,7 +126,7 @@ function App() {
       }
       
       // Redirect based on role if not on correct route
-      const targetRoute = role === 'admin' 
+      const targetRoute = isAdmin(role)
         ? '/admin/dashboard' 
         : role === 'employee' 
         ? '/employee/dashboard' 

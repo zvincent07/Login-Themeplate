@@ -5,6 +5,7 @@ import { checkPasswordStrength, getPasswordRequirements } from '../utils/passwor
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
 import CursorTracker from '../utils/cursorTracker';
+import { isAdmin } from '../utils/roleHelpers';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -193,7 +194,7 @@ const Register = () => {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         const role = response.data.user?.roleName || 'user';
-        if (role === 'admin') {
+        if (isAdmin(role)) {
           navigate('/admin/dashboard');
         } else if (role === 'employee') {
           navigate('/employee/dashboard');

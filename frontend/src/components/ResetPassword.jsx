@@ -4,6 +4,7 @@ import authService from '../services/authService';
 import { checkPasswordStrength, getPasswordRequirements } from '../utils/passwordStrength';
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
+import { isAdmin } from '../utils/roleHelpers';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -92,7 +93,7 @@ const ResetPassword = () => {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         const role = response.data.user?.roleName || 'user';
-        if (role === 'admin') {
+        if (isAdmin(role)) {
           navigate('/admin/dashboard');
         } else if (role === 'employee') {
           navigate('/employee/dashboard');

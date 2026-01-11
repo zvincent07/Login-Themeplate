@@ -3,6 +3,7 @@ import { Button } from './ui';
 import ThemeToggle from './ThemeToggle';
 import authService from '../services/authService';
 import { useEffect, useState } from 'react';
+import { isAdmin } from '../utils/roleHelpers';
 
 const NotFound = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -16,7 +17,7 @@ const NotFound = () => {
 
     if (authenticated && user) {
       const role = user.roleName || 'user';
-      if (role === 'admin') {
+      if (isAdmin(role)) {
         setDashboardPath('/admin/dashboard');
       } else if (role === 'employee') {
         setDashboardPath('/employee/dashboard');

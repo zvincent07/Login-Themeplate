@@ -139,8 +139,9 @@ const validateCreateUser = [
     .withMessage('Last name must be less than 50 characters'),
   body('roleName')
     .optional()
-    .isIn(['admin', 'employee', 'user'])
-    .withMessage('Role must be admin, employee, or user'),
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Role name must be between 1 and 50 characters'),
   handleValidationErrors,
 ];
 
@@ -176,8 +177,9 @@ const validateUpdateUser = [
     .withMessage('Last name must be less than 50 characters'),
   body('roleName')
     .optional()
-    .isIn(['admin', 'employee', 'user'])
-    .withMessage('Role must be admin, employee, or user'),
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Role name must be between 1 and 50 characters'),
   body('isActive')
     .optional()
     .isBoolean()

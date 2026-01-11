@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
+import { isAdmin } from '../utils/roleHelpers';
 
 const VerifyOTP = () => {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ const VerifyOTP = () => {
         localStorage.removeItem('pendingEmail');
         
         const role = response.data.user?.roleName || 'user';
-        if (role === 'admin') {
+        if (isAdmin(role)) {
           navigate('/admin/dashboard', { replace: true });
         } else if (role === 'employee') {
           navigate('/employee/dashboard', { replace: true });
