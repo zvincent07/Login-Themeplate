@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import roleService from '../../../services/roleService';
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
@@ -12,6 +12,11 @@ import PermissionsMatrix from './PermissionsMatrix';
 const Roles = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Track if we have successfully loaded data at least once
+  const hasLoadedData = useRef(false);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -45,10 +50,16 @@ const Roles = () => {
   // Fetch roles
   const fetchRoles = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedData.current) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
+
       const response = await roleService.getRoles();
       if (response.success) {
         setRoles(response.data || []);
+        hasLoadedData.current = true;
       }
     } catch (error) {
       setToast({
@@ -57,6 +68,7 @@ const Roles = () => {
       });
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -367,7 +379,7 @@ const Roles = () => {
         />
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
           Role-Based Access Control (RBAC)
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
@@ -408,7 +420,7 @@ const Roles = () => {
       />
 
       {/* Roles Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+      <div className={`bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden ${isRefreshing ? 'opacity-70 transition-opacity' : ''}`}>
         {loading ? (
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">Loading roles...</p>
@@ -681,9 +693,21 @@ const Roles = () => {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">
-              Create New Role
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+                Create New Role
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <form onSubmit={handleSubmitCreate}>
               <div className="mb-4">
                 <Label htmlFor="create-name">Role Name *</Label>
@@ -716,24 +740,32 @@ const Roles = () => {
                   placeholder="Brief description of the role"
                 />
               </div>
-              <div className="flex gap-3">
-                <Button
+              <div className="mt-4 flex justify-end gap-2">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => setShowCreateModal(false)}
                   disabled={submitting}
-                  className="flex-1"
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   type="submit"
-                  loading={submitting}
                   disabled={submitting}
-                  className="flex-1"
+                  className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
                 >
-                  Create Role
-                </Button>
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    'Create Role'
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -744,9 +776,21 @@ const Roles = () => {
       {showEditModal && selectedRole && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">
-              Edit Role
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+                Edit Role
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <form onSubmit={handleSubmitEdit}>
               <div className="mb-4">
                 <Label htmlFor="edit-name">Role Name *</Label>
@@ -780,24 +824,32 @@ const Roles = () => {
                   placeholder="Brief description of the role"
                 />
               </div>
-              <div className="flex gap-3">
-                <Button
+              <div className="mt-4 flex justify-end gap-2">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => setShowEditModal(false)}
                   disabled={submitting}
-                  className="flex-1"
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   type="submit"
-                  loading={submitting}
                   disabled={submitting}
-                  className="flex-1"
+                  className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
                 >
-                  Update Role
-                </Button>
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    'Update Role'
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -825,26 +877,33 @@ const Roles = () => {
                 </span>
               )}
             </p>
-            <div className="flex gap-3">
-              <Button
+            <div className="mt-4 flex justify-end gap-2">
+              <button
                 type="button"
-                variant="outline"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={submitting}
-                className="flex-1"
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant="danger"
                 onClick={handleConfirmDelete}
-                loading={submitting}
                 disabled={submitting || selectedRole.userCount > 0 || isSystemRole(selectedRole.name)}
-                className="flex-1"
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
               >
-                Delete Role
-              </Button>
+                {submitting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  'Delete Role'
+                )}
+              </button>
             </div>
           </div>
         </div>

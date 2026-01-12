@@ -273,30 +273,42 @@ exports.login = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    // Record failed attempt for admin emails
-    if (isAdminEmail) {
-      const attempt = await LoginAttempt.recordFailedAttempt(ip, email, true);
-      const attemptCount = attempt.attempts;
-      
-      // Ban IP after 5 failed attempts for admin email
-      if (attemptCount >= 5) {
-        await BannedIP.banIP(ip, 'failed_admin_login', null, 1); // Ban for 1 hour
-        return res.status(403).json({
-          success: false,
-          error: 'Too many failed login attempts. Your IP has been temporarily banned for 1 hour.',
-        });
-      }
-      
-      return res.status(401).json({
+    // Record failed attempt for all emails (stricter thresholds for admin-like emails)
+    const attempt = await LoginAttempt.recordFailedAttempt(ip, email, isAdminEmail);
+    const attemptCount = attempt.attempts;
+    const maxAttempts = isAdminEmail ? 5 : 10;
+    const banReason = isAdminEmail ? 'failed_admin_login' : 'failed_login';
+    const banDurationHours = isAdminEmail ? 1 : 0.5; // 1 hour for admin, 30 minutes for others
+
+    // Audit log: LOGIN_FAILED (user not found)
+    const { createAuditLog } = require('../utils/auditLogger');
+    createAuditLog({
+      req,
+      actor: null, // No user exists
+      action: 'LOGIN_FAILED',
+      resourceType: 'auth',
+      resourceId: email, // Use email as resourceId when user doesn't exist
+      resourceName: email,
+      details: {
+        reason: 'User not found',
+        attemptCount,
+        maxAttempts,
+        isAdminEmail,
+      },
+    });
+
+    if (attemptCount >= maxAttempts) {
+      await BannedIP.banIP(ip, banReason, null, banDurationHours);
+      return res.status(403).json({
         success: false,
-        error: 'Invalid credentials',
-        remainingAttempts: Math.max(0, 5 - attemptCount),
+        error: 'Too many failed login attempts. Your IP has been temporarily banned. Please try again later.',
       });
     }
-    
+
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials',
+      remainingAttempts: Math.max(0, maxAttempts - attemptCount),
     });
   }
 
@@ -311,30 +323,42 @@ exports.login = asyncHandler(async (req, res) => {
   // Verify password
   const isPasswordValid = await user.matchPassword(password);
   if (!isPasswordValid) {
-    // Record failed attempt for admin emails
-    if (isAdminEmail) {
-      const attempt = await LoginAttempt.recordFailedAttempt(ip, email, true);
-      const attemptCount = attempt.attempts;
-      
-      // Ban IP after 5 failed attempts for admin email
-      if (attemptCount >= 5) {
-        await BannedIP.banIP(ip, 'failed_admin_login', null, 1); // Ban for 1 hour
-        return res.status(403).json({
-          success: false,
-          error: 'Too many failed login attempts. Your IP has been temporarily banned for 1 hour.',
-        });
-      }
-      
-      return res.status(401).json({
+    // Record failed attempt for all emails (stricter thresholds for admin-like emails)
+    const attempt = await LoginAttempt.recordFailedAttempt(ip, email, isAdminEmail);
+    const attemptCount = attempt.attempts;
+    const maxAttempts = isAdminEmail ? 5 : 10;
+    const banReason = isAdminEmail ? 'failed_admin_login' : 'failed_login';
+    const banDurationHours = isAdminEmail ? 1 : 0.5; // 1 hour for admin, 30 minutes for others
+
+    // Audit log: LOGIN_FAILED
+    const { createAuditLog } = require('../utils/auditLogger');
+    createAuditLog({
+      req,
+      actor: user, // User exists but password was wrong
+      action: 'LOGIN_FAILED',
+      resourceType: 'auth',
+      resourceId: user._id.toString(),
+      resourceName: user.email,
+      details: {
+        reason: 'Invalid password',
+        attemptCount,
+        maxAttempts,
+        isAdminEmail,
+      },
+    });
+
+    if (attemptCount >= maxAttempts) {
+      await BannedIP.banIP(ip, banReason, null, banDurationHours);
+      return res.status(403).json({
         success: false,
-        error: 'Invalid credentials',
-        remainingAttempts: Math.max(0, 5 - attemptCount),
+        error: 'Too many failed login attempts. Your IP has been temporarily banned. Please try again later.',
       });
     }
-    
+
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials',
+      remainingAttempts: Math.max(0, maxAttempts - attemptCount),
     });
   }
 
@@ -447,6 +471,21 @@ exports.login = asyncHandler(async (req, res) => {
         console.error('Session creation error:', err);
       });
     });
+
+  // Audit log: LOGIN_SUCCESS
+  const { createAuditLog } = require('../utils/auditLogger');
+  createAuditLog({
+    req,
+    actor: user,
+    action: 'LOGIN_SUCCESS',
+    resourceType: 'auth',
+    resourceId: user._id.toString(),
+    resourceName: user.email,
+    details: {
+      rememberMe: !!rememberMe,
+      roleName,
+    },
+  });
 
   res.status(200).json({
     success: true,
@@ -602,6 +641,20 @@ exports.googleCallback = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/logout
 // @access  Private
 exports.logout = asyncHandler(async (req, res) => {
+  // Audit log: LOGOUT
+  if (req.user) {
+    const { createAuditLog } = require('../utils/auditLogger');
+    createAuditLog({
+      req,
+      actor: req.user,
+      action: 'LOGOUT',
+      resourceType: 'auth',
+      resourceId: req.user.id.toString(),
+      resourceName: req.user.email,
+      details: {},
+    });
+  }
+
   res.status(200).json({
     success: true,
     message: 'Logged out successfully',
@@ -654,6 +707,19 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
   try {
     await sendPasswordResetEmail(user.email, resetUrl, user.firstName || 'User');
+    
+    // Audit log: PASSWORD_RESET_REQUEST
+    const { createAuditLog } = require('../utils/auditLogger');
+    createAuditLog({
+      req,
+      actor: user,
+      action: 'PASSWORD_RESET_REQUEST',
+      resourceType: 'auth',
+      resourceId: user._id.toString(),
+      resourceName: user.email,
+      details: {},
+    });
+
     res.status(200).json({
       success: true,
       message: 'Password reset email sent successfully',
@@ -724,6 +790,20 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   }
   
   await user.save();
+
+  // Audit log: PASSWORD_RESET_SUCCESS
+  const { createAuditLog } = require('../utils/auditLogger');
+  createAuditLog({
+    req,
+    actor: user,
+    action: 'PASSWORD_RESET_SUCCESS',
+    resourceType: 'auth',
+    resourceId: user._id.toString(),
+    resourceName: user.email,
+    details: {
+      emailVerified: wasUnverified,
+    },
+  });
 
   // Generate token for automatic login
   const authToken = generateToken(user._id);

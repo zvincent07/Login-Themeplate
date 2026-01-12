@@ -15,6 +15,23 @@ const UserFilters = ({
   sortOrder,
   setSortOrder,
 }) => {
+  // Check if any filters are applied (not in default state)
+  const hasActiveFilters = 
+    searchTerm.trim() !== '' ||
+    roleFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    providerFilter !== 'all' ||
+    sortBy !== 'createdAt' ||
+    sortOrder !== 'desc';
+
+  const handleReset = () => {
+    setSearchTerm('');
+    setRoleFilter('all');
+    setStatusFilter('all');
+    setProviderFilter('all');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+  };
   const [roles, setRoles] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
 
@@ -43,11 +60,11 @@ const UserFilters = ({
   }, []);
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
+      <div className="flex-1 flex flex-col sm:flex-row flex-wrap gap-3">
         {/* Search */}
-        <div className="lg:col-span-2">
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <div className="flex-[2] min-w-[200px]">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             Search
           </label>
           <input
@@ -55,24 +72,24 @@ const UserFilters = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by email..."
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
         </div>
 
         {/* Role Filter */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <div className="w-full sm:w-auto">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             Role
           </label>
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
             disabled={loadingRoles}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="all">All Roles</option>
             {loadingRoles ? (
-              <option value="">Loading roles...</option>
+              <option value="">Loading...</option>
             ) : (
               roles.map((role) => (
                 <option key={role._id || role.id} value={role.name}>
@@ -84,33 +101,32 @@ const UserFilters = ({
         </div>
 
         {/* Status Filter */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <div className="w-full sm:w-auto">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             Status
           </label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="verified">Verified</option>
             <option value="unverified">Unverified</option>
-            {/* <option value="deleted">Deleted</option> */}
           </select>
         </div>
 
         {/* Provider Filter */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <div className="w-full sm:w-auto">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             Provider
           </label>
           <select
             value={providerFilter}
             onChange={(e) => setProviderFilter(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
           >
             <option value="all">All Providers</option>
             <option value="local">Local</option>
@@ -119,15 +135,15 @@ const UserFilters = ({
         </div>
 
         {/* Sort By */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <div className="w-full sm:w-auto">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             Sort By
           </label>
           <div className="flex gap-2">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             >
               <option value="createdAt">Created At</option>
               <option value="email">Email</option>
@@ -137,7 +153,7 @@ const UserFilters = ({
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
+              className="px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
               title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
             >
               {sortOrder === 'asc' ? (
@@ -153,6 +169,21 @@ const UserFilters = ({
           </div>
         </div>
       </div>
+
+      {/* Reset Filters Button - Only show when filters are applied */}
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={handleReset}
+          className="self-start sm:self-auto h-9 w-9 flex items-center justify-center text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors shadow-sm hover:shadow"
+          title="Reset all filters"
+          aria-label="Reset filters"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 };

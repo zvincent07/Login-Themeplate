@@ -8,6 +8,7 @@ import { SEARCH_DEBOUNCE_MS } from '../constants';
 export const useUserFilters = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -22,11 +23,20 @@ export const useUserFilters = () => {
 
   // AbortController ref for canceling in-flight requests
   const abortControllerRef = useRef(null);
+  
+  // Track if we have successfully loaded data at least once
+  const hasLoadedData = useRef(false);
 
   // Fetch users with pagination and filters (server-side filtering)
   const fetchUsers = useCallback(async (page = 1, signal = null) => {
     try {
-      setLoading(true);
+      // Only show full loading state if we haven't loaded data yet
+      if (!hasLoadedData.current) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
+      
       setError(null);
       const response = await userService.getUsers(page, itemsPerPage, {
         search: searchTerm,
@@ -44,6 +54,7 @@ export const useUserFilters = () => {
       
       if (response.success) {
         setUsers(response.data || []);
+        hasLoadedData.current = true;
         if (response.pagination) {
           setTotalPages(response.pagination.pages || 1);
           setTotalUsers(response.pagination.total || 0);
@@ -60,6 +71,7 @@ export const useUserFilters = () => {
     } finally {
       if (!signal?.aborted) {
         setLoading(false);
+        setIsRefreshing(false);
       }
     }
   }, [itemsPerPage, searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
@@ -88,10 +100,36 @@ export const useUserFilters = () => {
     };
   }, [currentPage, fetchUsers, searchTerm]);
 
-  // Reset to page 1 when filters change
-  useEffect(() => {
+  // Wrappers to reset page when filters change
+  const handleSearchTerm = (term) => {
+    setSearchTerm(term);
     setCurrentPage(1);
-  }, [searchTerm, roleFilter, statusFilter, providerFilter, sortBy, sortOrder]);
+  };
+
+  const handleRoleFilter = (role) => {
+    setRoleFilter(role);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilter = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleProviderFilter = (provider) => {
+    setProviderFilter(provider);
+    setCurrentPage(1);
+  };
+
+  const handleSortBy = (sort) => {
+    setSortBy(sort);
+    setCurrentPage(1);
+  };
+
+  const handleSortOrder = (order) => {
+    setSortOrder(order);
+    setCurrentPage(1);
+  };
 
   // Memoized filtered users (server-side filtering, so just return users)
   const filteredUsers = useMemo(() => users, [users]);
@@ -101,6 +139,7 @@ export const useUserFilters = () => {
     users,
     filteredUsers,
     loading,
+    isRefreshing,
     error,
     searchTerm,
     roleFilter,
@@ -115,12 +154,12 @@ export const useUserFilters = () => {
     
     // Setters
     setUsers,
-    setSearchTerm,
-    setRoleFilter,
-    setStatusFilter,
-    setProviderFilter,
-    setSortBy,
-    setSortOrder,
+    setSearchTerm: handleSearchTerm,
+    setRoleFilter: handleRoleFilter,
+    setStatusFilter: handleStatusFilter,
+    setProviderFilter: handleProviderFilter,
+    setSortBy: handleSortBy,
+    setSortOrder: handleSortOrder,
     setCurrentPage,
     setError,
     

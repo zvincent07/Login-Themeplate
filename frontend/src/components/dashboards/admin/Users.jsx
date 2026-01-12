@@ -803,7 +803,7 @@ const Users = () => {
         />
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
           User Management
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
@@ -925,7 +925,7 @@ const Users = () => {
       )}
 
       {/* Users Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+      <div className={`bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden ${filters.isRefreshing ? 'opacity-70 transition-opacity' : ''}`}>
         {filters.loading ? (
           <div className="p-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">Loading users...</p>
@@ -1537,10 +1537,22 @@ const Users = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-3">
-                Create New User
-              </h2>
-              <form onSubmit={handleSubmitCreate}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
+                  Create New User
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <form onSubmit={handleSubmitCreate} autoComplete="off">
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1548,6 +1560,7 @@ const Users = () => {
                     </label>
                     <input
                       type="email"
+                      autoComplete="off"
                       value={management.formData.email}
                       onChange={(e) =>
                         management.setFormData({ ...management.formData, email: e.target.value })
@@ -1570,6 +1583,7 @@ const Users = () => {
                       <div className="relative">
                         <input
                           type={management.showPassword ? 'text' : 'password'}
+                          autoComplete="new-password"
                           value={management.formData.password}
                           onChange={(e) =>
                             management.setFormData({ ...management.formData, password: e.target.value })
@@ -1754,9 +1768,24 @@ const Users = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-3">
-                Edit User
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
+                  Edit User
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedUser(null);
+                  }}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
               <form onSubmit={handleSubmitEdit}>
                 <div className="space-y-3">
                   <div>
@@ -1880,18 +1909,18 @@ const Users = () => {
                     </div>
                   </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Role *
-                      </label>
-                      <select
-                        value={management.formData.roleName}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, roleName: e.target.value })
-                        }
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Role *
+                    </label>
+                    <select
+                      value={management.formData.roleName}
+                      onChange={(e) =>
+                        management.setFormData({ ...management.formData, roleName: e.target.value })
+                      }
                         disabled={loadingRoles}
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
+                    >
                         {loadingRoles ? (
                           <option value="">Loading roles...</option>
                         ) : roles.length === 0 ? (
@@ -1903,8 +1932,8 @@ const Users = () => {
                             </option>
                           ))
                         )}
-                      </select>
-                    </div>
+                    </select>
+                  </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center">
@@ -2404,7 +2433,7 @@ const Users = () => {
                         sessions.setUserSessions([]);
                         sessions.setSelectedSessionForMap(null);
                     }}
-                    className="px-4 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                   >
                     Close
                   </button>
@@ -2431,7 +2460,7 @@ const Users = () => {
                         }}
                         disabled={isViewingCurrentUser}
                         title={isViewingCurrentUser ? "You cannot edit your own account" : "Edit user"}
-                        className={`px-4 py-2 text-sm rounded-md shadow-sm hover:shadow-md transition-shadow ${
+                        className={`px-3 py-1.5 text-sm rounded-md shadow-sm hover:shadow-md transition-shadow ${
                           isViewingCurrentUser
                             ? 'bg-gray-400 dark:bg-gray-600 text-white cursor-not-allowed opacity-50 pointer-events-none'
                             : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'

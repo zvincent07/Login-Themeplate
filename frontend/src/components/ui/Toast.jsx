@@ -1,14 +1,41 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const Toast = ({ message, type = 'success', onClose, duration = 5000 }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Animate in on mount
+  useEffect(() => {
+    const enterTimer = setTimeout(() => {
+      setIsVisible(true);
+    }, 10); // small delay so transition runs
+    return () => clearTimeout(enterTimer);
+  }, []);
+
+  // If the message or type changes while the toast is already shown,
+  // reset visibility so the animation and timer feel "fresh" again.
+  useEffect(() => {
+    setIsVisible(true);
+  }, [message, type]);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    // Wait for exit animation before removing from DOM
+    setTimeout(() => {
+      onClose();
+    }, 250);
+  };
+
+  // Auto-dismiss after duration.
+  // Include message/type so a new toast gets a full duration instead of
+  // reusing the remaining time from the previous one.
   useEffect(() => {
     if (duration > 0) {
       const timer = setTimeout(() => {
-        onClose();
+        handleClose();
       }, duration);
       return () => clearTimeout(timer);
     }
-  }, [duration, onClose]);
+  }, [duration, message, type]);
 
   const bgColor = type === 'success' 
     ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
@@ -29,8 +56,11 @@ const Toast = ({ message, type = 'success', onClose, duration = 5000 }) => {
     : 'text-blue-500';
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] animate-in slide-in-from-top-2 fade-in duration-300">
-      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg p-4 min-w-[300px] max-w-[500px]">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
+      <div
+        className={`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg p-4 min-w-[300px] max-w-[500px] transform transition-all duration-250 ease-out
+          ${isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-3 scale-95'}`}
+      >
         <div className="flex items-start gap-3">
           {type === 'success' && (
             <svg
@@ -84,7 +114,7 @@ const Toast = ({ message, type = 'success', onClose, duration = 5000 }) => {
             <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{message}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <svg

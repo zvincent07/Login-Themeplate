@@ -5,6 +5,7 @@ const Session = require('../models/Session');
 const { generateOTP, getOTPExpiry } = require('../utils/generateOTP');
 const { sendOTPEmail } = require('../services/emailService');
 const crypto = require('crypto');
+const { createAuditLog } = require('../utils/auditLogger');
 
 // @desc    Create User (Admin only) - Supports Admin, Employee, and User roles
 // @route   POST /api/users/employees
@@ -112,6 +113,20 @@ exports.createEmployee = asyncHandler(async (req, res) => {
       },
     },
   });
+
+  // Audit log (fire and forget)
+  createAuditLog({
+    req,
+    action: 'USER_CREATED',
+    resourceType: 'user',
+    resourceId: newUser._id.toString(),
+    resourceName: `${newUser.firstName || ''} ${newUser.lastName || ''}`.trim() || newUser.email,
+    details: {
+      createdBy: req.user?.email,
+      roleName: newUser.roleName,
+      isEmailVerified: newUser.isEmailVerified,
+    },
+  });
 });
 
 // @desc    Get all users (Admin only)
@@ -216,8 +231,12 @@ exports.getUser = asyncHandler(async (req, res) => {
     });
   }
 
-  // Users can only view their own profile unless they're admin
-  if (req.user.roleName !== 'admin' && req.user.id !== req.params.id) {
+  // Users can only view their own profile unless they're admin-like (admin or super admin)
+  const isAdminLike = ['admin', 'super admin'].includes(
+    (req.user.roleName || '').toLowerCase()
+  );
+
+  if (!isAdminLike && req.user.id !== req.params.id) {
     return res.status(403).json({
       success: false,
       error: 'Not authorized to view this user',
@@ -243,24 +262,28 @@ exports.updateUser = asyncHandler(async (req, res) => {
     });
   }
 
-  // Users can only update their own profile unless they're admin
-  if (req.user.roleName !== 'admin' && req.user.id !== req.params.id) {
+  // Users can only update their own profile unless they're admin-like (admin or super admin)
+  const isAdminLike = ['admin', 'super admin'].includes(
+    (req.user.roleName || '').toLowerCase()
+  );
+
+  if (!isAdminLike && req.user.id !== req.params.id) {
     return res.status(403).json({
       success: false,
       error: 'Not authorized to update this user',
     });
   }
 
-  // Admins can update role, but regular users cannot
+  // Admins (including super admin) can update role, but regular users cannot
   const updateData = { ...req.body };
-  if (req.user.roleName !== 'admin') {
+  if (!isAdminLike) {
     delete updateData.role;
     delete updateData.roleName;
     delete updateData.isActive;
   }
 
-  // Prevent admins from editing/deactivating their own account
-  if (req.user.roleName === 'admin' && req.user.id === req.params.id) {
+  // Prevent admin-like users from editing/deactivating their own account
+  if (isAdminLike && req.user.id === req.params.id) {
     // Completely prevent editing own account through admin panel
     // This prevents accidental self-modification that could lock the admin out
     return res.status(400).json({
@@ -268,6 +291,16 @@ exports.updateUser = asyncHandler(async (req, res) => {
       error: 'You cannot edit your own account.',
     });
   }
+
+  // Capture before state for audit log
+  const beforeState = {
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    roleName: user.roleName,
+    isActive: user.isActive,
+    isEmailVerified: user.isEmailVerified,
+  };
 
   // Handle password update - need to hash it before saving
   // If password is provided, mark it as modified so the pre-save hook will hash it
@@ -289,9 +322,40 @@ exports.updateUser = asyncHandler(async (req, res) => {
     .select('-password')
     .populate('role');
 
+  // Capture after state
+  const afterState = {
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    roleName: user.roleName,
+    isActive: user.isActive,
+    isEmailVerified: user.isEmailVerified,
+  };
+
+  // Determine action type based on changes
+  let action = 'USER_UPDATED';
+  if (beforeState.roleName !== afterState.roleName) {
+    action = 'USER_PROMOTED'; // Role change
+  }
+
   res.status(200).json({
     success: true,
     data: user,
+  });
+
+  // Audit log with changes tracking (fire and forget)
+  const { createAuditLogWithChanges } = require('../utils/auditLogger');
+  createAuditLogWithChanges({
+    req,
+    action,
+    resourceType: 'user',
+    resourceId: user._id.toString(),
+    resourceName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+    before: beforeState,
+    after: afterState,
+    details: {
+      updatedFields: Object.keys(updateData),
+    },
   });
 });
 
@@ -323,6 +387,18 @@ exports.deleteUser = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: {},
+  });
+
+  // Audit log (fire and forget)
+  createAuditLog({
+    req,
+    action: 'USER_DELETED',
+    resourceType: 'user',
+    resourceId: user._id.toString(),
+    resourceName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+    details: {
+      reason: 'soft_delete',
+    },
   });
 });
 
@@ -359,6 +435,18 @@ exports.restoreUser = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: restoredUser,
+  });
+
+  // Audit log (fire and forget)
+  createAuditLog({
+    req,
+    action: 'USER_RESTORED',
+    resourceType: 'user',
+    resourceId: restoredUser._id.toString(),
+    resourceName: `${restoredUser.firstName || ''} ${restoredUser.lastName || ''}`.trim() || restoredUser.email,
+    details: {
+      restoredBy: req.user?.email,
+    },
   });
 });
 

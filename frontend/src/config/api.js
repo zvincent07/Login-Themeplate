@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   users: '/users',
   chatbot: '/chatbot',
   roles: '/roles',
+  auditLogs: '/audit-logs',
 };
 
 export default API_BASE_URL;

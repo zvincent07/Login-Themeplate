@@ -10,7 +10,7 @@ const bannedIPSchema = new mongoose.Schema(
     reason: {
       type: String,
       required: true,
-      enum: ['bot_detection', 'suspicious_activity', 'manual_ban', 'failed_admin_login'],
+      enum: ['bot_detection', 'suspicious_activity', 'manual_ban', 'failed_admin_login', 'failed_login'],
       default: 'bot_detection',
     },
     bannedAt: {

@@ -2,6 +2,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 const Role = require('../models/Role');
 const User = require('../models/User');
 const Permission = require('../models/Permission');
+const { createAuditLog } = require('../utils/auditLogger');
 
 // @desc    Get all roles
 // @route   GET /api/roles
@@ -213,6 +214,18 @@ exports.createRole = asyncHandler(async (req, res) => {
     message: 'Role created successfully',
     data: role,
   });
+
+  // Audit log (fire and forget)
+  createAuditLog({
+    req,
+    action: 'ROLE_CREATED',
+    resourceType: 'role',
+    resourceId: role._id.toString(),
+    resourceName: role.name,
+    details: {
+      description: role.description,
+    },
+  });
 });
 
 // @desc    Update role
@@ -285,6 +298,18 @@ exports.updateRole = asyncHandler(async (req, res) => {
       userCount,
     },
   });
+
+  // Audit log (fire and forget)
+  createAuditLog({
+    req,
+    action: 'ROLE_UPDATED',
+    resourceType: 'role',
+    resourceId: role._id.toString(),
+    resourceName: role.name,
+    details: {
+      updatedFields: Object.keys(req.body || {}),
+    },
+  });
 });
 
 // @desc    Delete role
@@ -328,5 +353,17 @@ exports.deleteRole = asyncHandler(async (req, res) => {
     success: true,
     message: 'Role deleted successfully',
     data: {},
+  });
+
+  // Audit log (fire and forget)
+  createAuditLog({
+    req,
+    action: 'ROLE_DELETED',
+    resourceType: 'role',
+    resourceId: role._id.toString(),
+    resourceName: role.name,
+    details: {
+      description: role.description,
+    },
   });
 });
