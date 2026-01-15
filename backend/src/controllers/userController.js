@@ -1,141 +1,56 @@
-const asyncHandler = require('../middleware/asyncHandler');
-const User = require('../models/User');
-const Role = require('../models/Role');
-const Session = require('../models/Session');
-const { generateOTP, getOTPExpiry } = require('../utils/generateOTP');
-const { sendOTPEmail } = require('../services/emailService');
-const crypto = require('crypto');
-const { createAuditLog } = require('../utils/auditLogger');
+/**
+ * USER CONTROLLER (THIN)
+ * 
+ * Controllers MUST:
+ * - Parse request
+ * - Call service
+ * - Return response
+ * 
+ * FORBIDDEN:
+ * - Database logic
+ * - Permission logic
+ * - Business rules
+ */
 
-// @desc    Create User (Admin only) - Supports Admin, Employee, and User roles
-// @route   POST /api/users/employees
+const asyncHandler = require('../middleware/asyncHandler');
+const userService = require('../services/userService');
+
+// @desc    Create User (Admin only)
+// @route   POST /api/v1/users/employees
 // @access  Private/Admin
 exports.createEmployee = asyncHandler(async (req, res) => {
   const { email, password, firstName, lastName, roleName = 'employee' } = req.body;
-
-  // Check if user exists
-  const userExists = await User.findOne({ email });
-
-  if (userExists) {
-    return res.status(400).json({
-      success: false,
-      error: 'User already exists',
-    });
-  }
-
-  // Get role (case-insensitive search)
-  const role = await Role.findOne({
-    name: { $regex: new RegExp(`^${roleName}$`, 'i') },
-  });
-
-  if (!role) {
-    return res.status(500).json({
-      success: false,
-      error: `${roleName} role not found. Please seed the database.`,
-    });
-  }
-
-  // Auto-generate password for Admin and Employee roles
-  let userPassword = password;
-  let shouldSendOTP = false;
-
-  if (roleName === 'admin' || roleName === 'employee') {
-    // Generate secure random password
-    userPassword = crypto.randomBytes(12).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
-    shouldSendOTP = true;
-  } else if (!password) {
-    // User role requires password
-    return res.status(400).json({
-      success: false,
-      error: 'Password is required for user role',
-    });
-  }
-
-  // Generate OTP for Admin and Employee
-  let otpCode = null;
-  let otpExpiresAt = null;
   
-  if (shouldSendOTP) {
-    otpCode = generateOTP();
-    otpExpiresAt = getOTPExpiry();
-  }
-
-  // Create user
-  const userData = {
-    email,
-    password: userPassword,
-    firstName,
-    lastName,
-    role: role._id,
-    roleName,
-    provider: 'local',
-    createdBy: req.user.id,
-    isEmailVerified: false,
-  };
-
-  if (shouldSendOTP) {
-    userData.otp = {
-      code: otpCode,
-      expiresAt: otpExpiresAt,
-    };
-  }
-
-  const newUser = await User.create(userData);
-
-  // Send OTP email for Admin and Employee (include password and userId)
-  if (shouldSendOTP) {
-    try {
-      await sendOTPEmail(email, otpCode, firstName, userPassword, newUser._id.toString());
-    } catch (error) {
-      // If email fails, delete the user and return error
-      await User.findByIdAndDelete(newUser._id);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to send verification email. Please try again.',
-      });
-    }
-  }
+  const result = await userService.createUser(
+    { email, password, firstName, lastName, roleName },
+    req.user
+  );
 
   res.status(201).json({
     success: true,
-    message: shouldSendOTP 
+    message: result.requiresVerification
       ? 'User created successfully! Verification email with OTP has been sent.'
       : 'User created successfully!',
     data: {
       user: {
-        id: newUser._id,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        roleName: newUser.roleName,
+        id: result.user._id,
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        roleName: result.user.roleName,
         isEmailVerified: false,
-        requiresVerification: shouldSendOTP,
+        requiresVerification: result.requiresVerification,
       },
-    },
-  });
-
-  // Audit log (fire and forget)
-  createAuditLog({
-    req,
-    action: 'USER_CREATED',
-    resourceType: 'user',
-    resourceId: newUser._id.toString(),
-    resourceName: `${newUser.firstName || ''} ${newUser.lastName || ''}`.trim() || newUser.email,
-    details: {
-      createdBy: req.user?.email,
-      roleName: newUser.roleName,
-      isEmailVerified: newUser.isEmailVerified,
     },
   });
 });
 
 // @desc    Get all users (Admin only)
-// @route   GET /api/users
+// @route   GET /api/v1/users
 // @access  Private/Admin
 exports.getUsers = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
   const search = req.query.search || '';
   const roleFilter = req.query.role || '';
   const statusFilter = req.query.status || '';
@@ -143,105 +58,65 @@ exports.getUsers = asyncHandler(async (req, res) => {
   const sortBy = req.query.sortBy || 'createdAt';
   const sortOrder = req.query.sortOrder || 'desc';
 
-  // Build query for filtering
-  const query = {};
-
-  // Search filter (email, firstName, lastName)
+  // Build filters (whitelisted fields only)
+  const filters = {};
+  
   if (search) {
-    query.$or = [
-      { email: { $regex: search, $options: 'i' } },
-      { firstName: { $regex: search, $options: 'i' } },
-      { lastName: { $regex: search, $options: 'i' } },
-    ];
+    filters.search = search;
   }
-
-  // Role filter
+  
   if (roleFilter && roleFilter !== 'all') {
-    query.roleName = roleFilter;
+    filters.roleName = roleFilter;
   }
-
-  // Status filter
+  
   if (statusFilter && statusFilter !== 'all') {
     if (statusFilter === 'active') {
-      query.isActive = true;
-      query.deletedAt = null; // Only show non-deleted active users
+      filters.isActive = true;
+      filters.deletedAt = null;
     } else if (statusFilter === 'inactive') {
-      query.isActive = false;
-      query.deletedAt = null; // Only show non-deleted inactive users
+      filters.isActive = false;
+      filters.deletedAt = null;
     } else if (statusFilter === 'verified') {
-      query.isEmailVerified = true;
-      query.deletedAt = null; // Only show non-deleted verified users
+      filters.isEmailVerified = true;
+      filters.deletedAt = null;
     } else if (statusFilter === 'unverified') {
-      query.isEmailVerified = false;
-      query.deletedAt = null; // Only show non-deleted unverified users
+      filters.isEmailVerified = false;
+      filters.deletedAt = null;
     } else if (statusFilter === 'deleted') {
-      query.deletedAt = { $ne: null }; // Only show deleted users
+      filters.deletedAt = { $ne: null };
     }
   } else {
-    // By default, exclude deleted users unless explicitly filtering for them
-    query.deletedAt = null;
+    filters.deletedAt = null;
   }
-
-  // Provider filter
+  
   if (providerFilter && providerFilter !== 'all') {
-    query.provider = providerFilter;
+    filters.provider = providerFilter;
   }
 
-  // Build sort object
-  const sort = {};
-  sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-
-  // Get total count for pagination (with filters applied)
-  const total = await User.countDocuments(query);
-
-  const users = await User.find(query)
-    .select('-password')
-    .populate('role')
-    .populate('createdBy', 'email firstName lastName')
-    .sort(sort)
-    .skip(skip)
-    .limit(limit);
+  const result = await userService.getUsers(
+    filters,
+    { page, limit, sortBy, sortOrder },
+    req.user
+  );
 
   res.status(200).json({
     success: true,
     pagination: {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit),
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      pages: result.pages,
     },
-    count: users.length,
-    data: users,
+    count: result.users.length,
+    data: result.users,
   });
 });
 
 // @desc    Get single user
-// @route   GET /api/users/:id
+// @route   GET /api/v1/users/:id
 // @access  Private
 exports.getUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id)
-    .select('-password')
-    .populate('role')
-    .populate('createdBy', 'email firstName lastName');
-
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'User not found',
-    });
-  }
-
-  // Users can only view their own profile unless they're admin-like (admin or super admin)
-  const isAdminLike = ['admin', 'super admin'].includes(
-    (req.user.roleName || '').toLowerCase()
-  );
-
-  if (!isAdminLike && req.user.id !== req.params.id) {
-    return res.status(403).json({
-      success: false,
-      error: 'Not authorized to view this user',
-    });
-  }
+  const user = await userService.getUserById(req.params.id, req.user);
 
   res.status(200).json({
     success: true,
@@ -250,345 +125,105 @@ exports.getUser = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update user
-// @route   PUT /api/users/:id
+// @route   PUT /api/v1/users/:id
 // @access  Private
 exports.updateUser = asyncHandler(async (req, res) => {
-  let user = await User.findById(req.params.id);
-
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'User not found',
-    });
-  }
-
-  // Users can only update their own profile unless they're admin-like (admin or super admin)
-  const isAdminLike = ['admin', 'super admin'].includes(
-    (req.user.roleName || '').toLowerCase()
+  const updatedUser = await userService.updateUser(
+    req.params.id,
+    req.body,
+    req.user,
+    req
   );
-
-  if (!isAdminLike && req.user.id !== req.params.id) {
-    return res.status(403).json({
-      success: false,
-      error: 'Not authorized to update this user',
-    });
-  }
-
-  // Admins (including super admin) can update role, but regular users cannot
-  const updateData = { ...req.body };
-  if (!isAdminLike) {
-    delete updateData.role;
-    delete updateData.roleName;
-    delete updateData.isActive;
-  }
-
-  // Prevent admin-like users from editing/deactivating their own account
-  if (isAdminLike && req.user.id === req.params.id) {
-    // Completely prevent editing own account through admin panel
-    // This prevents accidental self-modification that could lock the admin out
-    return res.status(400).json({
-      success: false,
-      error: 'You cannot edit your own account.',
-    });
-  }
-
-  // Capture before state for audit log
-  const beforeState = {
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    roleName: user.roleName,
-    isActive: user.isActive,
-    isEmailVerified: user.isEmailVerified,
-  };
-
-  // Handle password update - need to hash it before saving
-  // If password is provided, mark it as modified so the pre-save hook will hash it
-  if (updateData.password) {
-    user.password = updateData.password;
-    delete updateData.password; // Remove from updateData, we'll set it directly
-  }
-
-  // Update other fields
-  Object.keys(updateData).forEach((key) => {
-    user[key] = updateData[key];
-  });
-
-  // Save the user (this will trigger the password hashing hook if password was changed)
-  await user.save();
-
-  // Return updated user without password
-  user = await User.findById(req.params.id)
-    .select('-password')
-    .populate('role');
-
-  // Capture after state
-  const afterState = {
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    roleName: user.roleName,
-    isActive: user.isActive,
-    isEmailVerified: user.isEmailVerified,
-  };
-
-  // Determine action type based on changes
-  let action = 'USER_UPDATED';
-  if (beforeState.roleName !== afterState.roleName) {
-    action = 'USER_PROMOTED'; // Role change
-  }
 
   res.status(200).json({
     success: true,
-    data: user,
-  });
-
-  // Audit log with changes tracking (fire and forget)
-  const { createAuditLogWithChanges } = require('../utils/auditLogger');
-  createAuditLogWithChanges({
-    req,
-    action,
-    resourceType: 'user',
-    resourceId: user._id.toString(),
-    resourceName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-    before: beforeState,
-    after: afterState,
-    details: {
-      updatedFields: Object.keys(updateData),
-    },
+    data: updatedUser,
   });
 });
 
 // @desc    Delete user (Admin only)
-// @route   DELETE /api/users/:id
+// @route   DELETE /api/v1/users/:id
 // @access  Private/Admin
 exports.deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'User not found',
-    });
-  }
-
-  // Prevent deleting yourself
-  if (req.user.id === req.params.id) {
-    return res.status(400).json({
-      success: false,
-      error: 'Cannot delete your own account',
-    });
-  }
-
-  // Soft delete: set deletedAt timestamp
-  user.deletedAt = new Date();
-  await user.save();
+  await userService.deleteUser(req.params.id, req.user);
 
   res.status(200).json({
     success: true,
     data: {},
   });
-
-  // Audit log (fire and forget)
-  createAuditLog({
-    req,
-    action: 'USER_DELETED',
-    resourceType: 'user',
-    resourceId: user._id.toString(),
-    resourceName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-    details: {
-      reason: 'soft_delete',
-    },
-  });
 });
 
 // @desc    Restore deleted user (Admin only)
-// @route   POST /api/users/:id/restore
+// @route   POST /api/v1/users/:id/restore
 // @access  Private/Admin
 exports.restoreUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'User not found',
-    });
-  }
-
-  if (!user.deletedAt) {
-    return res.status(400).json({
-      success: false,
-      error: 'User is not deleted',
-    });
-  }
-
-  // Restore: clear deletedAt
-  user.deletedAt = null;
-  await user.save();
-
-  // Return updated user without password
-  const restoredUser = await User.findById(req.params.id)
-    .select('-password')
-    .populate('role')
-    .populate('createdBy', 'email firstName lastName');
+  const restoredUser = await userService.restoreUser(req.params.id, req.user);
 
   res.status(200).json({
     success: true,
     data: restoredUser,
   });
-
-  // Audit log (fire and forget)
-  createAuditLog({
-    req,
-    action: 'USER_RESTORED',
-    resourceType: 'user',
-    resourceId: restoredUser._id.toString(),
-    resourceName: `${restoredUser.firstName || ''} ${restoredUser.lastName || ''}`.trim() || restoredUser.email,
-    details: {
-      restoredBy: req.user?.email,
-    },
-  });
 });
 
 // @desc    Get user statistics (Admin only)
-// @route   GET /api/users/stats
+// @route   GET /api/v1/users/stats
 // @access  Private/Admin
 exports.getUserStats = asyncHandler(async (req, res) => {
-  const totalUsers = await User.countDocuments({ deletedAt: null });
-  const activeUsers = await User.countDocuments({ isActive: true, deletedAt: null });
-  const unverifiedUsers = await User.countDocuments({ isEmailVerified: false, deletedAt: null });
+  const stats = await userService.getUserStats(req.user);
 
   res.status(200).json({
     success: true,
-    data: {
-      total: totalUsers,
-      active: activeUsers,
-      unverified: unverifiedUsers,
-    },
+    data: stats,
   });
 });
 
 // @desc    Get user sessions (Admin only)
-// @route   GET /api/users/:id/sessions
+// @route   GET /api/v1/users/:id/sessions
 // @access  Private/Admin
 exports.getUserSessions = asyncHandler(async (req, res) => {
-  const userId = req.params.id;
   const currentToken = req.headers.authorization?.split(' ')[1];
-
-  // Build query for active sessions
-  const query = {
-    user: userId,
-    isActive: true,
-    expiresAt: { $gt: new Date() },
-  };
-
-  // Get all active sessions (no pagination - show all in scrollable list)
-  const sessions = await Session.find(query)
-    .sort({ lastActive: -1 })
-    .select('-token'); // Don't expose tokens
-
-  // Mark current session
-  const sessionsWithCurrent = sessions.map((session) => {
-    const sessionObj = session.toObject();
-    sessionObj.isCurrent = false;
-    return sessionObj;
-  });
-
-  // Mark the session matching current token as current
-  if (sessionsWithCurrent.length > 0 && currentToken) {
-    const currentSession = await Session.findOne({
-      user: userId,
-      token: currentToken,
-      isActive: true,
-    }).select('_id');
-    
-    if (currentSession) {
-      sessionsWithCurrent.forEach((session) => {
-        if (session._id.toString() === currentSession._id.toString()) {
-          session.isCurrent = true;
-        }
-      });
-    }
-  }
-
-  res.status(200).json({
-    success: true,
-    data: sessionsWithCurrent,
-  });
-});
-
-// @desc    Terminate user session (Admin only)
-// @route   DELETE /api/users/:id/sessions/:sessionId
-// @access  Private/Admin
-exports.terminateSession = asyncHandler(async (req, res) => {
-  const { id: userId, sessionId } = req.params;
-
-  const session = await Session.findOne({
-    _id: sessionId,
-    user: userId,
-    isActive: true,
-  });
-
-  if (!session) {
-    return res.status(404).json({
-      success: false,
-      error: 'Session not found',
-    });
-  }
-
-  // Deactivate session
-  session.isActive = false;
-  await session.save();
-
-  res.status(200).json({
-    success: true,
-    message: 'Session terminated successfully',
-  });
-});
-
-// @desc    Terminate all other user sessions except current (Admin only)
-// @route   DELETE /api/users/:id/sessions
-// @access  Private/Admin
-exports.terminateAllOtherSessions = asyncHandler(async (req, res) => {
-  const userId = req.params.id;
-  const currentToken = req.headers.authorization?.split(' ')[1];
-
-  if (!currentToken) {
-    return res.status(400).json({
-      success: false,
-      error: 'Current session token is required',
-    });
-  }
-
-  // Find the current session
-  const currentSession = await Session.findOne({
-    user: userId,
-    token: currentToken,
-    isActive: true,
-  });
-
-  if (!currentSession) {
-    return res.status(404).json({
-      success: false,
-      error: 'Current session not found',
-    });
-  }
-
-  // Deactivate all other sessions except the current one
-  const result = await Session.updateMany(
-    {
-      user: userId,
-      isActive: true,
-      _id: { $ne: currentSession._id },
-    },
-    {
-      $set: { isActive: false },
-    }
+  const sessions = await userService.getUserSessions(
+    req.params.id,
+    currentToken,
+    req.user
   );
 
   res.status(200).json({
     success: true,
-    message: `Terminated ${result.modifiedCount} session(s) successfully`,
-    terminatedCount: result.modifiedCount,
+    data: sessions,
+  });
+});
+
+// @desc    Terminate user session (Admin only)
+// @route   DELETE /api/v1/users/:id/sessions/:sessionId
+// @access  Private/Admin
+exports.terminateSession = asyncHandler(async (req, res) => {
+  const result = await userService.terminateSession(
+    req.params.id,
+    req.params.sessionId,
+    req.user
+  );
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+  });
+});
+
+// @desc    Terminate all other user sessions except current (Admin only)
+// @route   DELETE /api/v1/users/:id/sessions
+// @access  Private/Admin
+exports.terminateAllOtherSessions = asyncHandler(async (req, res) => {
+  const currentToken = req.headers.authorization?.split(' ')[1];
+  const result = await userService.terminateAllOtherSessions(
+    req.params.id,
+    currentToken,
+    req.user
+  );
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+    terminatedCount: result.terminatedCount,
   });
 });

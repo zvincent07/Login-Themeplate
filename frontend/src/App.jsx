@@ -11,7 +11,7 @@ import UserDashboard from './components/dashboards/UserDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
 import EmployeeDashboard from './components/dashboards/EmployeeDashboard';
 import authService from './services/authService';
-import { isAdmin } from './utils/roleHelpers';
+import { isAdmin } from './utils/permissions';
 
 function App() {
   const navigate = useNavigate();

@@ -1,0 +1,49 @@
+import React from 'react';
+
+/**
+ * Email Templates Page
+ * 
+ * Communication & Notifications:
+ * - Editor to customize transactional emails
+ * - Welcome, Password Reset, etc.
+ * - Announcements (banner/notification system)
+ */
+const EmailTemplates = () => {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-4">
+        Email Templates
+      </h1>
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+        <div className="text-center py-12">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-slate-100">
+            Email Templates
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            This page will contain:
+          </p>
+          <ul className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-left max-w-md mx-auto space-y-2">
+            <li>• Email Template Editor (Welcome, Password Reset, etc.)</li>
+            <li>• Announcements System (Banner/notification management)</li>
+            <li>• Preview & Test Email Functionality</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EmailTemplates;

@@ -13,7 +13,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import api from '../../../services/api';
+import dashboardService from '../../../services/dashboardService';
 
 const DashboardOverview = () => {
   const [stats, setStats] = useState({
@@ -27,7 +27,7 @@ const DashboardOverview = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await api.get('/dashboard/stats');
+        const response = await dashboardService.getDashboardStats();
         if (response.success && response.data) {
           setStats(prev => ({
             ...prev,

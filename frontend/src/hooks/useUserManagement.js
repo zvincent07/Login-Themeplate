@@ -14,7 +14,7 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
     lastName: '',
     roleName: 'user',
     isActive: true,
-    isEmailVerified: false,
+    // Note: isEmailVerified is not in backend updateUserFields, so we don't include it here
   });
   const [formErrors, setFormErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
@@ -79,6 +79,19 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
   }, [formData]);
 
   /**
+   * Filter out MongoDB/system fields from data
+   */
+  const filterAllowedFields = useCallback((data, allowedFields) => {
+    const filtered = {};
+    allowedFields.forEach(field => {
+      if (data.hasOwnProperty(field) && data[field] !== undefined) {
+        filtered[field] = data[field];
+      }
+    });
+    return filtered;
+  }, []);
+
+  /**
    * Create user
    */
   const handleCreate = useCallback(async () => {
@@ -87,7 +100,17 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
     try {
       setSubmitting(true);
       setFormErrors({});
-      const response = await userService.createUser(formData);
+      
+      // Only send allowed fields: email, password, firstName, lastName, roleName
+      const allowedFields = ['email', 'password', 'firstName', 'lastName', 'roleName'];
+      let createData = filterAllowedFields(formData, allowedFields);
+      
+      // Don't send password for Admin/Employee (will be auto-generated)
+      if (createData.roleName === 'admin' || createData.roleName === 'employee') {
+        delete createData.password;
+      }
+      
+      const response = await userService.createUser(createData);
       
       if (response.success) {
         return { success: true, data: response.data };
@@ -101,7 +124,7 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
     } finally {
       setSubmitting(false);
     }
-  }, [formData, validateForm]);
+  }, [formData, validateForm, filterAllowedFields]);
 
   /**
    * Update user with Optimistic UI
@@ -131,11 +154,17 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
 
     try {
       setSubmitting(true);
-      const dataToUpdate = { ...updateData };
+      
+      // Only send allowed fields: firstName, lastName, email, password, role, roleName, isActive
+      // Note: isEmailVerified is validated but not in updateUserFields - backend might need update
+      const allowedFields = ['firstName', 'lastName', 'email', 'password', 'role', 'roleName', 'isActive'];
+      let dataToUpdate = filterAllowedFields(updateData, allowedFields);
+      
       // Don't send password if it's empty (not changing password)
-      if (!dataToUpdate.password) {
+      if (!dataToUpdate.password || dataToUpdate.password.trim() === '') {
         delete dataToUpdate.password;
       }
+      
       const response = await userService.updateUser(userId, dataToUpdate);
       
       if (response.success) {
@@ -154,7 +183,7 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
     } finally {
       setSubmitting(false);
     }
-  }, [users, setUsers, isOwnAccount, fetchStats]);
+  }, [users, setUsers, isOwnAccount, fetchStats, filterAllowedFields]);
 
   /**
    * Delete user with Optimistic UI
@@ -244,11 +273,14 @@ export const useUserManagement = (currentUserId, users, setUsers, stats, setStat
     
     try {
       setSubmitting(true);
-      const updateData = {
-        ...user,
-        isActive: newIsActive,
-      };
-      delete updateData.password; // Don't send password
+      
+      // Only send allowed fields: firstName, lastName, email, password, role, roleName, isActive
+      const allowedFields = ['firstName', 'lastName', 'email', 'password', 'role', 'roleName', 'isActive'];
+      const updateData = filterAllowedFields({ ...user, isActive: newIsActive }, allowedFields);
+      
+      // Don't send password (not changing password)
+      delete updateData.password;
+      
       const response = await userService.updateUser(userId, updateData);
       
       if (response.success) {

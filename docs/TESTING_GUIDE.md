@@ -1,232 +1,220 @@
 # Testing Guide
 
-This guide covers how to run and write tests for the Login Themeplate project.
+## Overview
 
-## 📋 Test Setup
-
-### Frontend Tests (Vitest)
-- **Framework**: Vitest (fast, Vite-native)
-- **Location**: `frontend/src/**/__tests__/**/*.test.js`
-- **Setup**: `frontend/src/test/setup.js`
-
-### Backend Tests (Jest)
-- **Framework**: Jest
-- **Location**: `backend/src/**/__tests__/**/*.test.js`
-- **Setup**: `backend/src/test/setup.js`
-
-### E2E Tests (Playwright)
-- **Framework**: Playwright
-- **Location**: `frontend/e2e/**/*.spec.js`
-- **Config**: `frontend/playwright.config.js`
+This guide covers testing strategies for the application following `.cursorrules` principles.
 
 ---
 
-## 🚀 Running Tests
+## 🎯 Testing Philosophy
 
-### Frontend Unit Tests
+### **Test Services, Not Controllers**
+- Controllers are thin - test services instead
+- Services contain business logic and permission enforcement
+- Controllers are just request/response handlers
 
-```bash
-cd frontend
+### **Mock Repositories**
+- Repositories are database access layer
+- Mock repositories in service tests
+- Test repositories separately with mocked models
 
-# Run all tests
-npm test
+### **Test Permission Enforcement**
+- Verify permissions are checked
+- Test ownership checks
+- Test access control
 
-# Run tests in watch mode
-npm test -- --watch
+### **Test Business Rules**
+- Test invariants
+- Test validation logic
+- Test error handling
 
-# Run tests with UI
-npm run test:ui
+---
 
-# Run tests with coverage
-npm run test:coverage
+## 📁 Test Structure
+
+```
+backend/src/
+├── services/
+│   └── __tests__/
+│       ├── userService.test.js
+│       ├── authService.test.js
+│       └── roleService.test.js
+├── repositories/
+│   └── __tests__/
+│       ├── userRepository.test.js
+│       └── roleRepository.test.js
+└── permissions/
+    └── __tests__/
+        └── index.test.js
+
+frontend/src/
+├── services/
+│   └── __tests__/
+│       ├── userService.test.js
+│       └── authService.test.js
+└── components/
+    └── __tests__/
+        └── Login.test.jsx
 ```
 
-### Backend Unit Tests
+---
 
+## 🧪 Running Tests
+
+### Backend
 ```bash
-cd backend
-
 # Run all tests
 npm test
 
-# Run tests in watch mode
+# Run specific test suite
+npm run test:services
+npm run test:repositories
+npm run test:permissions
+
+# Watch mode
 npm run test:watch
 
-# Run tests with coverage
+# Coverage
 npm run test:coverage
 ```
 
-### E2E Tests
-
+### Frontend
 ```bash
-cd frontend
+# Run all tests
+npm test
 
-# Run E2E tests
-npx playwright test
+# Watch mode
+npm run test:watch
 
-# Run E2E tests in UI mode
-npx playwright test --ui
-
-# Run E2E tests for specific browser
-npx playwright test --project=chromium
+# Coverage
+npm run test:coverage
 ```
 
 ---
 
-## ✍️ Writing Tests
+## 📝 Test Examples
 
-### Frontend Hook Test Example
+### Service Test Example
 
 ```javascript
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { useUserFilters } from '../useUserFilters';
+describe('UserService', () => {
+  it('should enforce permission before returning users', async () => {
+    requirePermission.mockImplementation(() => {});
+    userRepository.findMany.mockResolvedValue({ users: [] });
 
-describe('useUserFilters', () => {
-  it('should initialize with default values', () => {
-    const { result } = renderHook(() => useUserFilters());
-    
-    expect(result.current.searchTerm).toBe('');
-    expect(result.current.roleFilter).toBe('all');
+    await userService.getUsers({}, {}, mockActor);
+
+    expect(requirePermission).toHaveBeenCalledWith(
+      mockActor,
+      'users:read',
+      'users list'
+    );
   });
 });
 ```
 
-### Backend Utility Test Example
+### Repository Test Example
 
 ```javascript
-const { validatePassword } = require('../passwordValidator');
+describe('UserRepository', () => {
+  it('should whitelist filter fields', async () => {
+    await userRepository.findMany(
+      { roleName: 'admin', maliciousField: 'hack' },
+      {}
+    );
 
-describe('passwordValidator', () => {
-  it('should return true for valid password', () => {
-    expect(validatePassword('Password123!')).toBe(true);
+    const queryCall = User.find.mock.calls[0][0];
+    expect(queryCall.maliciousField).toBeUndefined();
+    expect(queryCall.roleName).toBe('admin');
   });
 });
 ```
 
-### E2E Test Example
+---
+
+## ✅ Test Coverage Goals
+
+- **Services**: 80%+ coverage
+- **Repositories**: 70%+ coverage
+- **Permissions**: 100% coverage
+- **Controllers**: Not required (too thin)
+
+---
+
+## 🔍 What to Test
+
+### **Services**
+- ✅ Permission enforcement
+- ✅ Business rules
+- ✅ Ownership checks
+- ✅ Error handling
+- ✅ Repository coordination
+
+### **Repositories**
+- ✅ Query building
+- ✅ Whitelisting
+- ✅ Data transformation
+- ✅ Error handling
+
+### **Permissions**
+- ✅ Permission checking
+- ✅ Role mapping
+- ✅ Access control
+- ✅ Edge cases
+
+---
+
+## 🚫 What NOT to Test
+
+- ❌ Controllers (too thin, test services instead)
+- ❌ Express middleware (test in integration tests)
+- ❌ Database connection (test in E2E tests)
+- ❌ External APIs (mock them)
+
+---
+
+## 📚 Test Utilities
+
+### Mock Factories
+Create reusable mock factories for common objects:
 
 ```javascript
-import { test, expect } from '@playwright/test';
-
-test('should display login page', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('input[type="email"]')).toBeVisible();
+const createMockUser = (overrides = {}) => ({
+  _id: 'user123',
+  email: 'test@example.com',
+  roleName: 'user',
+  ...overrides,
 });
 ```
 
----
+### Test Helpers
+Create helpers for common test patterns:
 
-## 📊 Test Coverage Goals
-
-- **Unit Tests**: 80%+ coverage for hooks, services, utilities
-- **Integration Tests**: Critical API endpoints
-- **E2E Tests**: Main user flows (login, register, admin operations)
-
----
-
-## 🎯 Test Structure
-
-```
-frontend/
-  src/
-    hooks/
-      __tests__/
-        useUserFilters.test.js
-        useUserManagement.test.js
-    services/
-      __tests__/
-        userService.test.js
-  test/
-    setup.js
-  e2e/
-    auth.spec.js
-    admin.spec.js
-
-backend/
-  src/
-    utils/
-      __tests__/
-        passwordValidator.test.js
-    controllers/
-      __tests__/
-        authController.test.js
-  test/
-    setup.js
+```javascript
+const expectPermissionRequired = async (serviceMethod, permission) => {
+  requirePermission.mockImplementation(() => {
+    throw new Error('Permission denied');
+  });
+  
+  await expect(serviceMethod()).rejects.toThrow('Permission denied');
+  expect(requirePermission).toHaveBeenCalledWith(
+    expect.any(Object),
+    permission,
+    expect.any(String)
+  );
+};
 ```
 
 ---
 
-## 💡 Best Practices
+## 🎯 Next Steps
 
-1. **Test Behavior, Not Implementation**
-   - Test what the code does, not how it does it
-
-2. **Use Descriptive Test Names**
-   - `should return error when email is invalid` ✅
-   - `test1` ❌
-
-3. **Arrange-Act-Assert Pattern**
-   ```javascript
-   // Arrange
-   const input = 'test@example.com';
-   
-   // Act
-   const result = validateEmail(input);
-   
-   // Assert
-   expect(result).toBe(true);
-   ```
-
-4. **Mock External Dependencies**
-   - Mock API calls, localStorage, etc.
-
-5. **Test Edge Cases**
-   - Empty inputs, null values, error states
-
-6. **Keep Tests Fast**
-   - Unit tests should run in milliseconds
-   - Use mocks for slow operations
+1. Add more service tests
+2. Add repository tests
+3. Add integration tests
+4. Add E2E tests (Playwright)
+5. Set up CI/CD test pipeline
 
 ---
 
-## 🔧 Troubleshooting
-
-### Tests Not Running
-
-1. **Check Node version**: Node.js 18+ required
-2. **Install dependencies**: `npm install`
-3. **Check test files**: Ensure files end with `.test.js` or `.spec.js`
-
-### Playwright Issues
-
-1. **Install browsers**: `npx playwright install`
-2. **Check disk space**: Playwright browsers require ~500MB
-3. **Check port**: Ensure port 3000 is available
-
-### Coverage Not Showing
-
-1. **Install coverage tool**: `npm install -D @vitest/coverage-v8`
-2. **Check config**: Ensure coverage is enabled in config
-
----
-
-## 📚 Resources
-
-- [Vitest Documentation](https://vitest.dev/)
-- [Jest Documentation](https://jestjs.io/)
-- [Playwright Documentation](https://playwright.dev/)
-- [Testing Library](https://testing-library.com/)
-
----
-
-## ✅ Example Test Checklist
-
-- [ ] Test happy path (normal operation)
-- [ ] Test error cases
-- [ ] Test edge cases (empty, null, undefined)
-- [ ] Test validation
-- [ ] Mock external dependencies
-- [ ] Use descriptive test names
-- [ ] Keep tests independent
-- [ ] Clean up after tests
+**Status**: Test structure created, ready for implementation

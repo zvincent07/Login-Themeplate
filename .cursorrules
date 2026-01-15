@@ -1,0 +1,405 @@
+FULL-STACK ENGINEERING RULES
+React Router v7 · Node.js · Express · MongoDB
+=================================================
+
+=================================================
+CORE ENGINEERING PRINCIPLES (ABSOLUTE)
+=================================================
+
+KISS
+- Prefer boring, readable solutions
+- Avoid clever abstractions
+
+DRY
+- One source of truth
+- Shared logic lives in one place
+
+CLEAN CODE
+- Readability > cleverness
+- Explicit naming
+- Small, focused files
+
+STABILITY FIRST
+- Never break the build
+- Never bypass types
+- Never ship warnings
+- Correctness > speed
+
+YAGNI
+- Build only what is needed
+
+=================================================
+FRONTEND ROUTING (REACT ROUTER v7)
+=================================================
+
+- React Router v7 ONLY
+- NEVER use react-router-dom
+- Routes defined ONLY in app/routes.ts
+- File names DO NOT define routes
+- Nested routes MUST be explicit
+- Layout routes MUST use <Outlet />
+- NEVER use children props
+
+=================================================
+ROUTE TYPE IMPORTS (NON-NEGOTIABLE)
+=================================================
+
+ALWAYS:
+import type { Route } from "./+types/route-name";
+
+NEVER:
+../+types/*
+../../+types/*
+
+If types are missing:
+1. Run npm run typecheck
+2. Or start dev server
+NEVER fix paths manually
+
+=================================================
+DATA LOADING & MUTATIONS
+=================================================
+
+- Loaders = reads
+- Actions = mutations
+- NEVER fetch in components
+- Components consume loaderData only
+- Let TypeScript infer return types
+
+=================================================
+TYPE-SAFE NAVIGATION
+=================================================
+
+- ALWAYS use href()
+- NEVER concatenate URLs
+
+=================================================
+FRONTEND COMPONENT RULES
+=================================================
+
+General:
+- One component = one responsibility
+- No logic-heavy JSX
+- Business logic lives in hooks or services
+- Shared UI lives in /components/ui
+
+MANDATORY COMPONENTS:
+- Buttons
+- Tables
+- Forms
+- Inputs
+- Modals
+
+RULE:
+If used more than once → MUST be a component
+
+=================================================
+UI COMPONENT REQUIREMENTS
+=================================================
+
+Buttons:
+- No inline buttons
+- Permission-aware when possible
+
+Tables:
+- Reusable
+- Config-driven columns
+- No copy-paste tables
+
+Forms:
+- Reusable inputs
+- Shared validation logic
+- No per-page custom validation
+
+=================================================
+FORBIDDEN UI ANTI-PATTERNS
+=================================================
+
+- Duplicated buttons
+- Inline permission checks everywhere
+- Copy-pasted tables
+- One-off components with no reuse
+- Fetching inside components
+
+=================================================
+AUTHORIZATION MODEL (CRITICAL)
+=================================================
+
+- Roles are implementation details
+- Permissions are the contract
+
+FORBIDDEN:
+user.role === "admin"
+
+=================================================
+CENTRAL PERMISSION MAP (MANDATORY)
+=================================================
+
+const ROLES = {
+  admin: [
+    "view:comments",
+    "create:posts",
+    "update:posts",
+    "delete:posts",
+  ],
+  moderator: [
+    "view:comments",
+    "update:posts",
+    "delete:posts",
+  ],
+  member: [
+    "view:comments",
+    "create:comments",
+  ],
+  guest: [
+    "view:comments",
+  ],
+} as const;
+
+type Role = keyof typeof ROLES;
+type Permission = (typeof ROLES)[Role][number];
+
+Rules:
+- Permission strings MUST be typed
+- NEVER hardcode permissions elsewhere
+
+=================================================
+AUTHORIZATION UTILITIES (REQUIRED)
+=================================================
+
+- hasPermission()
+- requirePermission()
+- Deny by default
+
+=================================================
+SERVER-SIDE ENFORCEMENT (NON-NEGOTIABLE)
+=================================================
+
+- Client checks are UX only
+- ALL reads and mutations must be enforced server-side
+- Assume the client is malicious
+
+=================================================
+OPTIMISTIC UI (REQUIRED FOR MUTATIONS)
+=================================================
+
+1. Snapshot previous state
+2. Update UI immediately
+3. Show feedback immediately
+4. Await API
+5. Roll back on error
+6. DO NOT refetch on success
+
+=================================================
+BACKEND ARCHITECTURE (NODE.JS)
+=================================================
+
+- Modern Node.js (ESM preferred)
+- async/await only
+- No callbacks
+- No logic in route handlers
+
+=================================================
+EXPRESS.JS (TRANSPORT LAYER ONLY)
+=================================================
+
+Express responsibilities:
+- Routing
+- Middleware composition
+- Input validation
+- Response formatting
+
+FORBIDDEN IN EXPRESS:
+- Business logic
+- Permission logic
+- Database queries
+- Complex conditionals
+
+=================================================
+BACKEND LAYERING (MANDATORY)
+=================================================
+
+routes/
+controllers/
+services/
+repositories/
+middlewares/
+permissions/
+utils/
+
+=================================================
+CONTROLLERS
+=================================================
+
+- Parse request
+- Call service
+- Return response
+
+FORBIDDEN:
+- Database logic
+- Permission logic
+- Business rules
+
+=================================================
+SERVICES (CORE LOGIC)
+=================================================
+
+Services MUST:
+- Contain business rules
+- Enforce permissions
+- Enforce ownership
+- Coordinate repositories
+- Enforce invariants
+
+=================================================
+DATABASE ACCESS (REPOSITORIES ONLY)
+=================================================
+
+- No DB calls in controllers
+- No DB calls in services except via repositories
+- Repositories return plain objects only
+
+=================================================
+MONGODB RULES (CRITICAL)
+=================================================
+
+- Schemas are mandatory
+- No schema-less writes
+- Validate at schema level
+- Index queried fields
+- Avoid deep nesting
+- Keep documents small
+- Prefer references when needed
+
+=================================================
+QUERY SAFETY
+=================================================
+
+- NEVER accept raw query objects
+- Whitelist allowed fields
+- Prevent NoSQL injection
+- Paginate all list queries
+- Limit all result sets
+
+=================================================
+INPUT VALIDATION (MANDATORY)
+=================================================
+
+- Validate body, params, and query
+- Validation happens BEFORE controllers
+- Reject unknown fields
+- Never trust frontend validation
+
+=================================================
+AUTHENTICATION (MISSING — NOW REQUIRED)
+=================================================
+
+- Authentication handled before authorization
+- Sessions or tokens validated in middleware
+- NEVER trust client identity
+- Token/session parsing happens once per request
+
+=================================================
+CSRF & SECURITY (MISSING — NOW REQUIRED)
+=================================================
+
+- CSRF protection for mutations
+- SameSite cookies when applicable
+- Secure + HttpOnly cookies
+- No sensitive data in URLs
+
+=================================================
+RATE LIMITING & ABUSE PROTECTION
+=================================================
+
+- Rate limit auth endpoints
+- Rate limit write-heavy endpoints
+- Protect against brute force attacks
+
+=================================================
+ERROR HANDLING
+=================================================
+
+- Fail fast
+- Proper HTTP status codes
+- No stack traces to client
+- Centralized error handler
+- Log server-side only
+
+=================================================
+LOGGING
+=================================================
+
+- Log errors with context
+- NEVER log secrets, tokens, or passwords
+- Logs must aid debugging, not leak data
+
+=================================================
+ENVIRONMENT & SECRETS
+=================================================
+
+- Env vars only
+- Never commit secrets
+- Validate env on startup
+- Fail startup if invalid
+
+=================================================
+API VERSIONING (MISSING — NOW REQUIRED)
+=================================================
+
+- APIs must be versioned (v1, v2, etc.)
+- No breaking changes without version bump
+
+=================================================
+DATABASE MIGRATIONS & SEEDING
+=================================================
+
+- Schema changes must be tracked
+- No manual production DB edits
+- Seed scripts must be idempotent
+
+=================================================
+TESTING RULES
+=================================================
+
+- Test services, not controllers
+- Mock repositories
+- Test permission enforcement
+- Test business rules
+- Security checks MUST be tested
+
+=================================================
+PERFORMANCE RULES
+=================================================
+
+- Index properly
+- Avoid N+1 queries
+- Cache reads when safe
+- Measure before optimizing
+
+=================================================
+GLOBAL ANTI-PATTERNS
+=================================================
+
+- Business logic in controllers
+- DB access in routes or UI
+- Trusting client input
+- Role-based conditionals
+- Untyped permissions
+- Fetching in components
+- Over-abstraction
+
+=================================================
+AI ASSISTANT ENFORCEMENT
+=================================================
+
+When assisting:
+- Enforce thin Express routes
+- Enforce service/repository separation
+- Enforce server-side permissions
+- Reject direct DB access
+- Follow this file strictly
+
+=================================================
+END OF RULE FILE
+=================================================

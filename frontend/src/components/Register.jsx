@@ -5,7 +5,7 @@ import { checkPasswordStrength, getPasswordRequirements } from '../utils/passwor
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
 import CursorTracker from '../utils/cursorTracker';
-import { isAdmin } from '../utils/roleHelpers';
+import { isAdmin } from '../utils/permissions';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -225,8 +225,9 @@ const Register = () => {
   };
 
   const handleGoogleLogin = () => {
+    // Use v1 endpoint for consistency
     const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
-    window.location.href = `${backendUrl}/api/auth/google`;
+    window.location.href = `${backendUrl}/api/v1/auth/google`;
   };
 
   // OTP Verification Step

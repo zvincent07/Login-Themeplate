@@ -22,9 +22,24 @@ const Button = ({
   className = '',
   children,
   size = 'md',
+  fullWidth = false,
   ...rest
 }) => {
-  const baseClasses = 'w-full font-medium rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+  // Check if className already contains a width utility class (w-auto, w-full, w-fit, etc.)
+  // If it does, respect it and don't add w-full
+  // Otherwise, add w-full by default for backward compatibility (forms, modals, etc.)
+  const hasWidthClass = className && (
+    className.includes('w-auto') || 
+    className.includes('w-full') || 
+    className.includes('w-fit') || 
+    className.includes('w-screen') ||
+    className.includes('w-min') ||
+    className.includes('w-max') ||
+    /\bw-\d+/.test(className) ||
+    /\bw-\[/.test(className)
+  );
+  
+  const baseClasses = 'font-medium rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
     primary: 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 shadow-sm hover:shadow-md transition-shadow',
@@ -39,7 +54,10 @@ const Button = ({
     lg: 'py-3 px-6 text-base',
   };
 
-  const combinedClasses = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`.trim();
+  // Add w-full only if no width class is specified in className
+  // If className has a width class (like w-auto), we don't add w-full, so no conflict
+  const widthClass = hasWidthClass ? '' : 'w-full';
+  const combinedClasses = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${widthClass} ${className}`.trim();
 
   return (
     <button

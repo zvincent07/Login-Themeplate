@@ -1,20 +1,9 @@
 /**
- * Check if a user has admin privileges (super admin or admin)
- * @param {string} roleName - The role name to check
- * @returns {boolean} - True if user is admin or super admin
+ * @deprecated Use permissions.js instead
+ * These helpers are kept for backward compatibility during migration
+ * Use hasPermission() from utils/permissions.js for feature checks
+ * Use isAdmin() from utils/permissions.js for navigation/routing only
  */
-export const isAdmin = (roleName) => {
-  if (!roleName) return false;
-  const role = roleName.toLowerCase();
-  return role === 'admin' || role === 'super admin';
-};
 
-/**
- * Check if a user has super admin privileges
- * @param {string} roleName - The role name to check
- * @returns {boolean} - True if user is super admin
- */
-export const isSuperAdmin = (roleName) => {
-  if (!roleName) return false;
-  return roleName.toLowerCase() === 'super admin';
-};
+// Re-export from permissions.js for backward compatibility
+export { isAdmin, isSuperAdmin } from './permissions';

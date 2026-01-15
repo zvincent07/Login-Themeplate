@@ -43,8 +43,22 @@ const connectDB = async () => {
         logger.info(`Retrying connection in ${retryDelay / 1000} seconds...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       } else {
-        logger.error('Failed to connect to MongoDB after maximum retries. Exiting...');
-        process.exit(1);
+        logger.error('Failed to connect to MongoDB after maximum retries.');
+        // In development, don't exit - allow server to start and retry later
+        // In production, exit to prevent serving requests without database
+        if (process.env.NODE_ENV === 'production') {
+          logger.error('Exiting in production mode due to database connection failure.');
+          process.exit(1);
+        } else {
+          logger.warn('Server will continue running in development mode. Database operations will fail until connection is established.');
+          // Set up automatic reconnection attempts
+          setTimeout(() => {
+            logger.info('Attempting to reconnect to MongoDB...');
+            connectDB().catch(() => {
+              // Silently fail - will retry again later
+            });
+          }, 30000); // Retry every 30 seconds
+        }
       }
     }
   }

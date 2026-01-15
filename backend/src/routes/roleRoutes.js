@@ -1,3 +1,10 @@
+/**
+ * DEPRECATED ROUTES - Use /api/v1/roles instead
+ * 
+ * These routes are kept for backward compatibility.
+ * New code should use the v1 routes with permission-based authorization.
+ */
+
 const express = require('express');
 const router = express.Router();
 const {
@@ -12,7 +19,7 @@ const {
 const { protect, authorize } = require('../middleware/auth');
 const { validateMongoId } = require('../middleware/validator');
 
-// All routes require authentication and admin authorization
+// All routes require authentication and admin authorization (deprecated - use requirePermission)
 router.use(protect);
 router.use(authorize('admin'));
 

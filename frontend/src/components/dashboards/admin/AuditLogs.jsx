@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import UAParser from 'ua-parser-js';
 import auditLogService from '../../../services/auditLogService';
-import Toast from '../../ui/Toast';
+import { Toast, Badge, Button, Modal, FormField, Input, Pagination } from '../../ui';
 
 const PAGE_SIZE = 20;
 
@@ -251,7 +251,7 @@ const AuditLogs = () => {
       await navigator.clipboard.writeText(JSON.stringify(selectedLog, null, 2));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       setToast({
         message: 'Failed to copy to clipboard',
         type: 'error',
@@ -309,19 +309,17 @@ const AuditLogs = () => {
     return option ? option.label : type.charAt(0).toUpperCase() + type.slice(1);
   };
 
-  const getBadgeClasses = (action) => {
+  const getBadgeVariant = (action) => {
     const color = getActionBadgeColor(action);
-    const baseClasses = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium';
-    
     switch (color) {
       case 'green':
-        return `${baseClasses} bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200`;
+        return 'success';
       case 'red':
-        return `${baseClasses} bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200`;
+        return 'danger';
       case 'blue':
-        return `${baseClasses} bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200`;
+        return 'info';
       default:
-        return `${baseClasses} bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200`;
+        return 'default';
     }
   };
 
@@ -336,36 +334,24 @@ const AuditLogs = () => {
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
-        Audit Logs
-      </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Detailed, read-only history of critical actions across users and roles.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+          Audit Logs
+        </h1>
       </div>
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Search
-            </label>
-            <input
+          <FormField label="Search" className="flex-1">
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search actor, target, or action…"
-              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
             />
-          </div>
+          </FormField>
 
-          <div className="w-full sm:w-40">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Resource
-            </label>
+          <FormField label="Resource" className="w-full sm:w-40">
             <select
               value={resourceType}
               onChange={handleResourceTypeChange}
@@ -377,12 +363,9 @@ const AuditLogs = () => {
                 </option>
               ))}
             </select>
-          </div>
+          </FormField>
 
-          <div className="w-full sm:w-40">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Action
-            </label>
+          <FormField label="Action" className="w-full sm:w-40">
             <select
               value={actionFilter}
               onChange={handleActionFilterChange}
@@ -397,27 +380,29 @@ const AuditLogs = () => {
                   </option>
                 ))}
             </select>
-          </div>
+          </FormField>
         </form>
 
         {/* Only show Reset button when filters are applied */}
         {(search.trim() !== '' || resourceType !== 'all' || actionFilter !== 'all') && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => {
               setSearch('');
               setResourceType('all');
               setActionFilter('all');
               fetchLogs({ page: 1, search: '', resourceType: 'all', action: 'all' });
             }}
-            className="self-start sm:self-auto h-9 w-9 flex items-center justify-center text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors shadow-sm hover:shadow"
+            className="self-start sm:self-auto h-9 w-9 p-0"
             title="Reset all filters"
             aria-label="Reset filters"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -483,9 +468,9 @@ const AuditLogs = () => {
                             </div>
                           </td>
                           <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap">
-                            <span className={getBadgeClasses(log.action)}>
+                            <Badge variant={getBadgeVariant(log.action)} size="sm">
                               {formatAction(log.action)}
-                            </span>
+                            </Badge>
                           </td>
                           <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
                             {log.resourceName || log.resourceId}
@@ -541,98 +526,29 @@ const AuditLogs = () => {
 
             {/* Pagination - Only show if totalPages > 1 */}
             {totalPages > 1 && (
-              <div className="px-4 py-2 border-t border-gray-200 dark:border-slate-700 flex items-center justify-center">
-                <div className="flex items-center gap-0.5">
-                  {/* First Page */}
-                  <button
-                    onClick={() => handlePageChange(1)}
-                    disabled={page === 1 || loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="First page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Previous Page */}
-                  <button
-                    onClick={() => handlePageChange(page - 1)}
-                    disabled={page === 1 || loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="Previous page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Current Page */}
-                  <button
-                    disabled
-                    className="w-7 h-7 flex items-center justify-center bg-blue-600 dark:bg-blue-500 text-white text-xs font-medium"
-                  >
-                    {page}
-                  </button>
-                  
-                  {/* Page Info */}
-                  <span className="px-1.5 text-xs text-gray-700 dark:text-gray-400">
-                    of {totalPages}
-                  </span>
-                  
-                  {/* Next Page */}
-                  <button
-                    onClick={() => handlePageChange(page + 1)}
-                    disabled={page >= totalPages || loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="Next page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Last Page */}
-                  <button
-                    onClick={() => handlePageChange(totalPages)}
-                    disabled={page >= totalPages || loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="Last page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                loading={loading}
+              />
             )}
           </>
         )}
       </div>
 
-      {/* Details Drawer */}
-      {showDrawer && selectedLog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-end z-50">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-2xl h-full overflow-y-auto shadow-xl">
-            <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
-                Audit Log Details
-              </h2>
-              <button
-                onClick={() => {
-                  setShowDrawer(false);
-                  setSelectedLog(null);
-                }}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
+      {/* Details Modal */}
+      <Modal
+        isOpen={showDrawer && !!selectedLog}
+        onClose={() => {
+          setShowDrawer(false);
+          setSelectedLog(null);
+        }}
+        title="Audit Log Details"
+        size="2xl"
+      >
+        {selectedLog && (
+          <div className="space-y-6">
               {/* Basic Info */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
@@ -647,9 +563,9 @@ const AuditLogs = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</span>
-                    <span className={getBadgeClasses(selectedLog.action)}>
+                    <Badge variant={getBadgeVariant(selectedLog.action)} size="sm">
                       {formatAction(selectedLog.action)}
-                    </span>
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Resource Type</span>
@@ -762,9 +678,11 @@ const AuditLogs = () => {
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                     Raw JSON Payload
                   </h3>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleCopyJSON}
-                    className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+                    className="w-auto flex items-center gap-1.5"
                     title="Copy JSON to clipboard"
                   >
                     {copied ? (
@@ -782,16 +700,15 @@ const AuditLogs = () => {
                         <span>Copy</span>
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
                 <pre className="bg-gray-50 dark:bg-slate-900/40 rounded-lg p-4 overflow-x-auto text-xs text-gray-800 dark:text-gray-200 font-mono relative">
                   {JSON.stringify(selectedLog, null, 2)}
                 </pre>
               </div>
-            </div>
-      </div>
-        </div>
-      )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

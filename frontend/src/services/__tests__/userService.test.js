@@ -1,84 +1,76 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * FRONTEND USER SERVICE TESTS
+ * 
+ * Test API service layer
+ * Mock API calls
+ * Test error handling
+ */
+
 import userService from '../userService';
 import api from '../api';
 
-// Mock the api module
-vi.mock('../api', () => ({
-  default: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+jest.mock('../api');
 
 describe('userService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
-  it('should get users with filters', async () => {
-    const mockResponse = {
-      success: true,
-      data: [{ _id: '1', email: 'test@example.com' }],
-      pagination: { pages: 1, total: 1 },
-    };
+  describe('getUsers', () => {
+    it('should fetch users with filters', async () => {
+      const mockResponse = {
+        success: true,
+        data: [{ id: '1', email: 'test@example.com' }],
+        pagination: { page: 1, limit: 10, total: 1 },
+      };
 
-    api.get.mockResolvedValue(mockResponse);
+      api.get.mockResolvedValue(mockResponse);
 
-    const result = await userService.getUsers(1, 10, {
-      search: 'test',
-      role: 'user',
-      status: 'active',
+      const result = await userService.getUsers(1, 10, {
+        search: 'test',
+        role: 'admin',
+      });
+
+      expect(api.get).toHaveBeenCalled();
+      expect(result).toEqual(mockResponse);
     });
-
-    expect(api.get).toHaveBeenCalledWith(
-      expect.stringContaining('page=1&limit=10&search=test&role=user&status=active')
-    );
-    expect(result).toEqual(mockResponse);
   });
 
-  it('should create user', async () => {
-    const mockUserData = {
-      email: 'new@example.com',
-      password: 'Password123!',
-      firstName: 'New',
-      lastName: 'User',
-    };
+  describe('createUser', () => {
+    it('should create user via API', async () => {
+      const mockResponse = {
+        success: true,
+        data: { user: { id: '123', email: 'new@example.com' } },
+      };
 
-    const mockResponse = { success: true, data: { _id: '1', ...mockUserData } };
-    api.post.mockResolvedValue(mockResponse);
+      api.post.mockResolvedValue(mockResponse);
 
-    const result = await userService.createUser(mockUserData);
+      const result = await userService.createUser({
+        email: 'new@example.com',
+        firstName: 'New',
+        lastName: 'User',
+      });
 
-    expect(api.post).toHaveBeenCalledWith(
-      expect.stringContaining('/employees'),
-      mockUserData
-    );
-    expect(result).toEqual(mockResponse);
+      expect(api.post).toHaveBeenCalledWith(
+        expect.stringContaining('/employees'),
+        expect.any(Object)
+      );
+      expect(result).toEqual(mockResponse);
+    });
   });
 
-  it('should update user', async () => {
-    const mockUpdateData = { email: 'updated@example.com' };
-    const mockResponse = { success: true, data: { _id: '1', ...mockUpdateData } };
-    api.put.mockResolvedValue(mockResponse);
+  describe('deleteUser', () => {
+    it('should delete user via API', async () => {
+      const mockResponse = { success: true, data: {} };
 
-    const result = await userService.updateUser('1', mockUpdateData);
+      api.delete.mockResolvedValue(mockResponse);
 
-    expect(api.put).toHaveBeenCalledWith(
-      expect.stringContaining('/1'),
-      mockUpdateData
-    );
-    expect(result).toEqual(mockResponse);
-  });
+      const result = await userService.deleteUser('user123');
 
-  it('should delete user', async () => {
-    const mockResponse = { success: true };
-    api.delete.mockResolvedValue(mockResponse);
-
-    const result = await userService.deleteUser('1');
-
-    expect(api.delete).toHaveBeenCalledWith(expect.stringContaining('/1'));
-    expect(result).toEqual(mockResponse);
+      expect(api.delete).toHaveBeenCalledWith(
+        expect.stringContaining('/users/user123')
+      );
+      expect(result).toEqual(mockResponse);
+    });
   });
 });

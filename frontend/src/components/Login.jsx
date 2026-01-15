@@ -6,7 +6,7 @@ import ThemeToggle from './ThemeToggle';
 import Chatbot from './Chatbot';
 import CursorTracker from '../utils/cursorTracker';
 import Toast from './ui/Toast';
-import { isAdmin } from '../utils/roleHelpers';
+import { isAdmin } from '../utils/permissions';
 
 // Dynamic Welcome Panel Component
 const DynamicWelcomePanel = () => {
@@ -126,6 +126,7 @@ const Login = () => {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
+        // Navigate based on role (for routing only - use permissions for features)
         const role = response.data.user?.roleName || 'user';
         if (isAdmin(role)) {
           navigate('/admin/dashboard');
@@ -184,8 +185,9 @@ const Login = () => {
 
   const handleGoogleLogin = () => {
     // Use full backend URL for Google OAuth to avoid redirect_uri_mismatch
+    // Use v1 endpoint for consistency
     const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
-    window.location.href = `${backendUrl}/api/auth/google`;
+    window.location.href = `${backendUrl}/api/v1/auth/google`;
   };
 
   return (

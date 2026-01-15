@@ -1,3 +1,10 @@
+/**
+ * DEPRECATED ROUTES - Use /api/v1/users instead
+ * 
+ * These routes are kept for backward compatibility.
+ * New code should use the v1 routes with permission-based authorization.
+ */
+
 const express = require('express');
 const router = express.Router();
 const {

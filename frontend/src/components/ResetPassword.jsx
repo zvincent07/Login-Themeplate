@@ -4,7 +4,7 @@ import authService from '../services/authService';
 import { checkPasswordStrength, getPasswordRequirements } from '../utils/passwordStrength';
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
-import { isAdmin } from '../utils/roleHelpers';
+import { isAdmin } from '../utils/permissions';
 
 const ResetPassword = () => {
   const navigate = useNavigate();

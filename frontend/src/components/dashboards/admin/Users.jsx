@@ -8,6 +8,7 @@ import UserFilters from './UserFilters';
 import UserSessions from './UserSessions';
 import { MAX_EXPORT_LIMIT } from '../../../constants';
 import { useUserFilters, useUserManagement, useUserSessions } from '../../../hooks';
+import { Modal, Table, Badge, DropdownMenu, Pagination, FormField, PasswordInput, Button, Input, PermissionButton } from '../../ui';
 
 /**
  * OPTIMISTIC UI PATTERN (for future updates):
@@ -247,14 +248,17 @@ const Users = () => {
     }
     
     setSelectedUser(user);
+    // Only set allowed fields for editing (exclude MongoDB/system fields)
+    // Allowed fields: firstName, lastName, email, password, role, roleName, isActive
+    // Note: isEmailVerified is not in backend updateUserFields, so we exclude it
     management.setFormData({
       email: user.email || '',
-      password: '',
+      password: '', // Empty by default (leave blank to keep current)
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       roleName: user.roleName || 'user',
       isActive: user.isActive !== undefined ? user.isActive : true,
-      isEmailVerified: user.isEmailVerified !== undefined ? user.isEmailVerified : false,
+      // Exclude: isEmailVerified, _id, createdAt, updatedAt, __v, otp, provider, createdBy, deletedAt
     });
     management.setFormErrors({});
     management.setShowPassword(false);
@@ -426,13 +430,8 @@ const Users = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Prepare data - don't send password for Admin/Employee (will be auto-generated)
-    const createData = { ...management.formData };
-    if (management.formData.roleName === 'admin' || management.formData.roleName === 'employee') {
-      delete createData.password; // Password will be auto-generated
-    }
-    
-    management.setFormData(createData);
+    // Note: filterAllowedFields in handleCreate will ensure only allowed fields are sent
+    // Password will be handled in handleCreate based on roleName
     const result = await management.handleCreate();
     
     if (result.success) {
@@ -807,8 +806,10 @@ const Users = () => {
           User Management
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -820,8 +821,8 @@ const Users = () => {
                 });
               });
             }}
-            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5"
             title="Export to CSV"
+            className="w-auto flex items-center gap-1.5"
           >
             <svg
               className="w-4 h-4"
@@ -838,10 +839,13 @@ const Users = () => {
             </svg>
             <span className="hidden sm:inline">Export CSV</span>
             <span className="sm:hidden">Export</span>
-          </button>
-          <button
+          </Button>
+          <PermissionButton
+            user={authService.getStoredUser()}
+            permission="users:create"
             onClick={handleCreate}
-            className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-1.5 shadow-sm hover:shadow-md"
+            size="sm"
+            className="w-auto flex items-center gap-1.5"
           >
             <svg
               className="w-4 h-4"
@@ -858,7 +862,7 @@ const Users = () => {
             </svg>
             <span className="hidden sm:inline">Create User</span>
             <span className="sm:hidden">Create</span>
-          </button>
+          </PermissionButton>
         </div>
       </div>
 
@@ -881,28 +885,34 @@ const Users = () => {
               </button>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleBulkExport}
                 disabled={management.submitting}
-                className="px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 rounded-md text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 flex items-center gap-1.5"
+                className="flex items-center gap-1.5 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span className="hidden sm:inline">Export Selected</span>
                 <span className="sm:hidden">Export</span>
-              </button>
-              <button
+              </Button>
+              <PermissionButton
+                user={authService.getStoredUser()}
+                permission="users:delete"
                 onClick={handleBulkDelete}
                 disabled={management.submitting}
-                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5"
+                variant="danger"
+                size="sm"
+                className="flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 <span className="hidden sm:inline">Delete Selected</span>
                 <span className="sm:hidden">Delete</span>
-              </button>
+              </PermissionButton>
             </div>
           </div>
         </div>
@@ -1016,37 +1026,25 @@ const Users = () => {
                             </div>
                             {/* Mobile: Show role and status inline */}
                             <div className="md:hidden mt-1 flex items-center gap-2 flex-wrap">
-                              <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 capitalize">
+                              <Badge variant="info" size="sm" className="capitalize">
                                 {user.roleName || 'user'}
-                              </span>
-                              {user.isActive ? (
-                                <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                                  Active
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
-                                  Inactive
-                                </span>
-                              )}
+                              </Badge>
+                              <Badge variant={user.isActive ? 'success' : 'danger'} size="sm">
+                                {user.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap hidden md:table-cell">
-                        <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 capitalize">
+                        <Badge variant="info" size="sm" className="capitalize">
                           {user.roleName || 'user'}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap hidden lg:table-cell">
-                        {user.isActive ? (
-                          <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 inline-flex text-xs leading-4 font-medium rounded bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
-                            Inactive
-                          </span>
-                        )}
+                        <Badge variant={user.isActive ? 'success' : 'danger'} size="sm">
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
                       </td>
                       <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap hidden lg:table-cell">
                         {user.isEmailVerified ? (
@@ -1463,690 +1461,453 @@ const Users = () => {
             
             {/* Pagination - Only show if totalUsers > 10 */}
             {filters.totalUsers > 10 && (
-              <div className="px-4 py-2 border-t border-gray-200 dark:border-slate-700 flex items-center justify-center">
-                <div className="flex items-center gap-0.5">
-                  {/* First Page */}
-                  <button
-                    onClick={() => filters.setCurrentPage(1)}
-                    disabled={filters.currentPage === 1 || filters.loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="First page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Previous Page */}
-                  <button
-                    onClick={() => filters.setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={filters.currentPage === 1 || filters.loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="Previous page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Current Page */}
-                  <button
-                    disabled
-                    className="w-7 h-7 flex items-center justify-center bg-blue-600 dark:bg-blue-500 text-white text-xs font-medium"
-                  >
-                    {filters.currentPage}
-                  </button>
-                  
-                  {/* Page Info */}
-                  <span className="px-1.5 text-xs text-gray-700 dark:text-gray-400">
-                    of {filters.totalPages}
-                  </span>
-                  
-                  {/* Next Page */}
-                  <button
-                    onClick={() => filters.setCurrentPage(prev => Math.min(filters.totalPages, prev + 1))}
-                    disabled={filters.currentPage === filters.totalPages || filters.loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="Next page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  
-                  {/* Last Page */}
-                  <button
-                    onClick={() => filters.setCurrentPage(filters.totalPages)}
-                    disabled={filters.currentPage === filters.totalPages || filters.loading}
-                    className="w-7 h-7 flex items-center justify-center border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-800"
-                    title="Last page"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                currentPage={filters.currentPage}
+                totalPages={filters.totalPages}
+                onPageChange={filters.setCurrentPage}
+                loading={filters.loading}
+              />
             )}
           </>
         )}
       </div>
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
-                  Create New User
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create New User"
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="create-user-form"
+              disabled={management.submitting}
+              loading={management.submitting}
+            >
+              {management.submitting ? 'Creating...' : 'Create User'}
+            </Button>
+          </>
+        }
+      >
+        <form id="create-user-form" onSubmit={handleSubmitCreate} autoComplete="off">
+          <div className="space-y-3">
+            <FormField
+              label="Email"
+              required
+              error={management.formErrors.email}
+            >
+              <Input
+                type="email"
+                autoComplete="off"
+                value={management.formData.email}
+                onChange={(e) =>
+                  management.setFormData({ ...management.formData, email: e.target.value })
+                }
+              />
+            </FormField>
+
+            {/* Password field - only show for 'user' role */}
+            {management.formData.roleName === 'user' ? (
+              <PasswordInput
+                value={management.formData.password}
+                onChange={(e) =>
+                  management.setFormData({ ...management.formData, password: e.target.value })
+                }
+                showPassword={management.showPassword}
+                onTogglePassword={() => management.setShowPassword(!management.showPassword)}
+                error={management.formErrors.password}
+                label="Password"
+                required
+                autoComplete="new-password"
+              />
+            ) : (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                <p className="text-xs text-blue-800 dark:text-blue-200">
+                  <strong>Note:</strong> Password will be auto-generated and sent via email. The user will need to verify their account using the OTP code sent to their email.
+                </p>
               </div>
-              <form onSubmit={handleSubmitCreate} autoComplete="off">
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      autoComplete="off"
-                      value={management.formData.email}
-                      onChange={(e) =>
-                        management.setFormData({ ...management.formData, email: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    />
-                    {management.formErrors.email && (
-                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {management.formErrors.email}
-                      </p>
-                    )}
-                  </div>
+            )}
 
-                  {/* Password field - only show for 'user' role */}
-                  {management.formData.roleName === 'user' ? (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Password *
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={management.showPassword ? 'text' : 'password'}
-                          autoComplete="new-password"
-                          value={management.formData.password}
-                          onChange={(e) =>
-                            management.setFormData({ ...management.formData, password: e.target.value })
-                          }
-                          className="w-full px-2.5 py-1.5 pr-9 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => management.setShowPassword(!management.showPassword)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                        >
-                          {management.showPassword ? (
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m0 0A9.97 9.97 0 015.12 5.12m3.17 3.17L12 12m-3.71-3.71L5.12 5.12M12 12l3.71 3.71M12 12l-3.71-3.71m7.42 7.42L18.88 18.88A9.97 9.97 0 0019 12a9.97 9.97 0 00-.12-1.88m-3.17 3.17L12 12m3.71 3.71L18.88 18.88"
-                              />
-                            </svg>
-                          ) : (
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                              />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {management.formErrors.password && (
-                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {management.formErrors.password}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                      <p className="text-xs text-blue-800 dark:text-blue-200">
-                        <strong>Note:</strong> Password will be auto-generated and sent via email. The user will need to verify their account using the OTP code sent to their email.
-                      </p>
-                    </div>
-                  )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                label="First Name"
+                required
+                error={management.formErrors.firstName}
+              >
+                <Input
+                  type="text"
+                  value={management.formData.firstName}
+                  onChange={(e) =>
+                    management.setFormData({ ...management.formData, firstName: e.target.value })
+                  }
+                />
+              </FormField>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        First Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={management.formData.firstName}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, firstName: e.target.value })
-                        }
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
-                      {management.formErrors.firstName && (
-                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {management.formErrors.firstName}
-                        </p>
-                      )}
-                    </div>
+              <FormField
+                label="Last Name"
+                required
+                error={management.formErrors.lastName}
+              >
+                <Input
+                  type="text"
+                  value={management.formData.lastName}
+                  onChange={(e) =>
+                    management.setFormData({ ...management.formData, lastName: e.target.value })
+                  }
+                />
+              </FormField>
+            </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Last Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={management.formData.lastName}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, lastName: e.target.value })
-                        }
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
-                      {management.formErrors.lastName && (
-                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {management.formErrors.lastName}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+            <FormField label="Role" required>
+              <select
+                value={management.formData.roleName}
+                onChange={(e) =>
+                  management.setFormData({ ...management.formData, roleName: e.target.value })
+                }
+                disabled={loadingRoles}
+                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingRoles ? (
+                  <option value="">Loading roles...</option>
+                ) : roles.length === 0 ? (
+                  <option value="">No roles available</option>
+                ) : (
+                  roles.map((role) => (
+                    <option key={role._id || role.id} value={role.name}>
+                      {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </FormField>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Role *
-                    </label>
-                    <select
-                      value={management.formData.roleName}
-                      onChange={(e) =>
-                        management.setFormData({ ...management.formData, roleName: e.target.value })
-                      }
-                      disabled={loadingRoles}
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loadingRoles ? (
-                        <option value="">Loading roles...</option>
-                      ) : roles.length === 0 ? (
-                        <option value="">No roles available</option>
-                      ) : (
-                        roles.map((role) => (
-                          <option key={role._id || role.id} value={role.name}>
-                            {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="isActive"
-                      checked={management.formData.isActive}
-                      onChange={(e) =>
-                        management.setFormData({ ...management.formData, isActive: e.target.checked })
-                      }
-                      className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
-                    />
-                    <label
-                      htmlFor="isActive"
-                      className="ml-2 block text-xs text-gray-700 dark:text-gray-300"
-                    >
-                      Active
-                    </label>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={management.submitting}
-                    className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
-                  >
-                    {management.submitting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Creating...</span>
-                      </>
-                    ) : (
-                      'Create User'
-                    )}
-                  </button>
-                </div>
-              </form>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={management.formData.isActive}
+                onChange={(e) =>
+                  management.setFormData({ ...management.formData, isActive: e.target.checked })
+                }
+                className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="isActive"
+                className="ml-2 block text-xs text-gray-700 dark:text-gray-300"
+              >
+                Active
+              </label>
             </div>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Edit Modal */}
-      {shouldShowEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
-                  Edit User
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedUser(null);
-                  }}
-                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  aria-label="Close"
+      <Modal
+        isOpen={shouldShowEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedUser(null);
+        }}
+        title="Edit User"
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowEditModal(false);
+                setSelectedUser(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="edit-user-form"
+              disabled={management.submitting}
+              loading={management.submitting}
+            >
+              {management.submitting ? 'Updating...' : 'Update User'}
+            </Button>
+          </>
+        }
+      >
+        <form id="edit-user-form" onSubmit={handleSubmitEdit}>
+          <div className="space-y-3">
+            <FormField
+              label="Email"
+              required
+              error={management.formErrors.email}
+            >
+              <Input
+                type="email"
+                value={management.formData.email}
+                onChange={(e) =>
+                  management.setFormData({ ...management.formData, email: e.target.value })
+                }
+              />
+            </FormField>
+
+            <PasswordInput
+              value={management.formData.password}
+              onChange={(e) =>
+                management.setFormData({ ...management.formData, password: e.target.value })
+              }
+              showPassword={management.showPassword}
+              onTogglePassword={() => management.setShowPassword(!management.showPassword)}
+              error={management.formErrors.password}
+              label="Password (leave blank to keep current)"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                label="First Name"
+                required
+                error={management.formErrors.firstName}
+              >
+                <Input
+                  type="text"
+                  value={management.formData.firstName}
+                  onChange={(e) =>
+                    management.setFormData({ ...management.formData, firstName: e.target.value })
+                  }
+                />
+              </FormField>
+
+              <FormField
+                label="Last Name"
+                required
+                error={management.formErrors.lastName}
+              >
+                <Input
+                  type="text"
+                  value={management.formData.lastName}
+                  onChange={(e) =>
+                    management.setFormData({ ...management.formData, lastName: e.target.value })
+                  }
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Role" required>
+              <select
+                value={management.formData.roleName}
+                onChange={(e) =>
+                  management.setFormData({ ...management.formData, roleName: e.target.value })
+                }
+                disabled={loadingRoles}
+                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingRoles ? (
+                  <option value="">Loading roles...</option>
+                ) : roles.length === 0 ? (
+                  <option value="">No roles available</option>
+                ) : (
+                  roles.map((role) => (
+                    <option key={role._id || role.id} value={role.name}>
+                      {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </FormField>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="editIsActive"
+                  checked={management.formData.isActive}
+                  onChange={(e) =>
+                    management.setFormData({ ...management.formData, isActive: e.target.checked })
+                  }
+                  className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
+                />
+                <label
+                  htmlFor="editIsActive"
+                  className="ml-2 block text-xs text-gray-700 dark:text-gray-300"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  Active
+                </label>
               </div>
-              <form onSubmit={handleSubmitEdit}>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={management.formData.email}
-                      onChange={(e) =>
-                        management.setFormData({ ...management.formData, email: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                    />
-                    {management.formErrors.email && (
-                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {management.formErrors.email}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Password (leave blank to keep current)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={management.showPassword ? 'text' : 'password'}
-                        value={management.formData.password}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, password: e.target.value })
-                        }
-                        className="w-full px-2.5 py-1.5 pr-9 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => management.setShowPassword(!management.showPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                      >
-                        {management.showPassword ? (
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m0 0A9.97 9.97 0 015.12 5.12m3.17 3.17L12 12m-3.71-3.71L5.12 5.12M12 12l3.71 3.71M12 12l-3.71-3.71m7.42 7.42L18.88 18.88A9.97 9.97 0 0019 12a9.97 9.97 0 00-.12-1.88m-3.17 3.17L12 12m3.71 3.71L18.88 18.88"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                    {management.formErrors.password && (
-                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                        {management.formErrors.password}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        First Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={management.formData.firstName}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, firstName: e.target.value })
-                        }
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
-                      {management.formErrors.firstName && (
-                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {management.formErrors.firstName}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Last Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={management.formData.lastName}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, lastName: e.target.value })
-                        }
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
-                      {management.formErrors.lastName && (
-                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          {management.formErrors.lastName}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Role *
-                    </label>
-                    <select
-                      value={management.formData.roleName}
-                      onChange={(e) =>
-                        management.setFormData({ ...management.formData, roleName: e.target.value })
-                      }
-                        disabled={loadingRoles}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loadingRoles ? (
-                          <option value="">Loading roles...</option>
-                        ) : roles.length === 0 ? (
-                          <option value="">No roles available</option>
-                        ) : (
-                          roles.map((role) => (
-                            <option key={role._id || role.id} value={role.name}>
-                              {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-                            </option>
-                          ))
-                        )}
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="editIsActive"
-                        checked={management.formData.isActive}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, isActive: e.target.checked })
-                        }
-                        className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
-                      />
-                      <label
-                        htmlFor="editIsActive"
-                        className="ml-2 block text-xs text-gray-700 dark:text-gray-300"
-                      >
-                        Active
-                      </label>
-                    </div>
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="editIsEmailVerified"
-                        checked={management.formData.isEmailVerified}
-                        onChange={(e) =>
-                          management.setFormData({ ...management.formData, isEmailVerified: e.target.checked })
-                        }
-                        className="h-3.5 w-3.5 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
-                      />
-                      <label
-                        htmlFor="editIsEmailVerified"
-                        className="ml-2 block text-xs text-gray-700 dark:text-gray-300"
-                      >
-                        Email Verified
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setSelectedUser(null);
-                    }}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={management.submitting}
-                    className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
-                  >
-                    {management.submitting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Updating...</span>
-                      </>
-                    ) : (
-                      'Update User'
-                    )}
-                  </button>
-                </div>
-              </form>
+              {/* Note: isEmailVerified is not in backend updateUserFields, so we don't include it in the form */}
+              {/* If you need to update email verification status, add it to backend updateUserFields first */}
             </div>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Bulk Delete Confirmation Modal */}
-      {showBulkDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-3">
-                Delete {selectedUsers.length} User{selectedUsers.length !== 1 ? 's' : ''}?
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Are you sure you want to delete {selectedUsers.length} selected user{selectedUsers.length !== 1 ? 's' : ''}? 
-                This action cannot be undone.
-              </p>
-              {bulkDeleteProgress.total > 0 && (
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-                    <span>Deleting...</span>
-                    <span>{bulkDeleteProgress.current} / {bulkDeleteProgress.total}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(bulkDeleteProgress.current / bulkDeleteProgress.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowBulkDeleteModal(false);
-                    setBulkDeleteProgress({ current: 0, total: 0 });
-                  }}
-                  disabled={management.submitting}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmBulkDelete}
-                  disabled={management.submitting}
-                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {management.submitting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Deleting...</span>
-                    </>
-                  ) : (
-                    'Delete'
-                  )}
-                </button>
-              </div>
+      <Modal
+        isOpen={showBulkDeleteModal}
+        onClose={() => {
+          setShowBulkDeleteModal(false);
+          setBulkDeleteProgress({ current: 0, total: 0 });
+        }}
+        title={`Delete ${selectedUsers.length} User${selectedUsers.length !== 1 ? 's' : ''}?`}
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowBulkDeleteModal(false);
+                setBulkDeleteProgress({ current: 0, total: 0 });
+              }}
+              disabled={management.submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmBulkDelete}
+              disabled={management.submitting}
+              variant="danger"
+              loading={management.submitting}
+            >
+              {management.submitting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Are you sure you want to delete {selectedUsers.length} selected user{selectedUsers.length !== 1 ? 's' : ''}? 
+          This action cannot be undone.
+        </p>
+        {bulkDeleteProgress.total > 0 && (
+          <div className="mb-4">
+            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+              <span>Deleting...</span>
+              <span>{bulkDeleteProgress.current} / {bulkDeleteProgress.total}</span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(bulkDeleteProgress.current / bulkDeleteProgress.total) * 100}%` }}
+              />
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
-      {shouldShowDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-3">
-                Delete User
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Are you sure you want to delete{' '}
-                <span className="font-semibold">
-                  {selectedUser?.firstName && selectedUser?.lastName
-                    ? `${selectedUser.firstName} ${selectedUser.lastName}`
-                    : selectedUser?.email}
-                </span>
-                ? This action cannot be undone.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setSelectedUser(null);
-                  }}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitDelete}
-                  disabled={management.submitting}
-                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {management.submitting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Deleting...</span>
-                    </>
-                  ) : (
-                    'Delete User'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={shouldShowDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setSelectedUser(null);
+        }}
+        title="Delete User"
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowDeleteModal(false);
+                setSelectedUser(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitDelete}
+              disabled={management.submitting}
+              variant="danger"
+              loading={management.submitting}
+            >
+              {management.submitting ? 'Deleting...' : 'Delete User'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Are you sure you want to delete{' '}
+          <span className="font-semibold">
+            {selectedUser?.firstName && selectedUser?.lastName
+              ? `${selectedUser.firstName} ${selectedUser.lastName}`
+              : selectedUser?.email}
+          </span>
+          ? This action cannot be undone.
+        </p>
+      </Modal>
 
       {/* View User Modal */}
-      {showViewModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-h-[90vh] flex flex-col ${
-            activeViewTab === 'sessions' ? 'max-w-4xl' : 'max-w-2xl'
-          }`}>
-            <div className={`p-6 ${activeViewTab === 'sessions' ? 'flex-shrink-0' : 'overflow-y-auto'}`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
-                  User Details
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setSelectedUser(null);
-                    setViewUserDetails(null);
-                    setActiveViewTab('details');
-                        sessions.setUserSessions([]);
-                        sessions.setSelectedSessionForMap(null);
-                  }}
-                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setSelectedUser(null);
+          setViewUserDetails(null);
+          setActiveViewTab('details');
+          sessions.setUserSessions([]);
+          sessions.setSelectedSessionForMap(null);
+        }}
+        title="User Details"
+        size={activeViewTab === 'sessions' ? 'xl' : 'lg'}
+        footer={
+          activeViewTab === 'details' ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowViewModal(false);
+                  setSelectedUser(null);
+                  setViewUserDetails(null);
+                  setActiveViewTab('details');
+                  sessions.setUserSessions([]);
+                  sessions.setSelectedSessionForMap(null);
+                }}
+              >
+                Close
+              </Button>
+              {viewUserDetails && (() => {
+                const viewUserId = viewUserDetails._id || viewUserDetails.id;
+                const isViewingCurrentUser = currentUserId && (viewUserId === currentUserId || viewUserId?.toString() === currentUserId.toString());
+                return (
+                  <PermissionButton
+                    user={authService.getStoredUser()}
+                    permission="users:update"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      // Double check before calling handler
+                      if (isViewingCurrentUser) {
+                        setToast({
+                          message: 'You cannot edit your own account.',
+                          type: 'error',
+                        });
+                        return;
+                      }
+                      
+                      setShowViewModal(false);
+                      handleEdit(viewUserDetails);
+                    }}
+                    disabled={isViewingCurrentUser}
+                    title={isViewingCurrentUser ? "You cannot edit your own account" : "Edit user"}
+                  >
+                    Edit User
+                  </PermissionButton>
+                );
+              })()}
+            </>
+          ) : null
+        }
+      >
+        <div className={`${activeViewTab === 'sessions' ? 'flex-shrink-0' : ''}`}>
 
               {/* Avatar and Basic Info */}
               {viewUserDetails && (
@@ -2230,9 +1991,9 @@ const Users = () => {
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                         Role
                       </label>
-                      <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 capitalize">
+                      <Badge variant="info" size="sm" className="capitalize">
                         {viewUserDetails.roleName || 'N/A'}
-                      </span>
+                      </Badge>
                     </div>
 
                     {/* Status */}
@@ -2240,15 +2001,9 @@ const Users = () => {
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                         Status
                       </label>
-                      {viewUserDetails.isActive ? (
-                        <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
-                          Inactive
-                        </span>
-                      )}
+                      <Badge variant={viewUserDetails.isActive ? 'success' : 'danger'} size="sm">
+                        {viewUserDetails.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
                     </div>
 
                     {/* Email Verified */}
@@ -2256,15 +2011,9 @@ const Users = () => {
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                         Email Verified
                       </label>
-                      {viewUserDetails.isEmailVerified ? (
-                        <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                          Verified
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
-                          Unverified
-                        </span>
-                      )}
+                      <Badge variant={viewUserDetails.isEmailVerified ? 'success' : 'warning'} size="sm">
+                        {viewUserDetails.isEmailVerified ? 'Verified' : 'Unverified'}
+                      </Badge>
                     </div>
 
                     {/* Provider */}
@@ -2421,62 +2170,8 @@ const Users = () => {
                 </div>
               )}
 
-              {/* Modal Footer - Only show for Details tab */}
-              {activeViewTab === 'details' && (
-                <div className="mt-6 flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-slate-700">
-                  <button
-                    onClick={() => {
-                      setShowViewModal(false);
-                      setSelectedUser(null);
-                      setViewUserDetails(null);
-                      setActiveViewTab('details');
-                        sessions.setUserSessions([]);
-                        sessions.setSelectedSessionForMap(null);
-                    }}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
-                  >
-                    Close
-                  </button>
-                  {viewUserDetails && (() => {
-                    const viewUserId = viewUserDetails._id || viewUserDetails.id;
-                    const isViewingCurrentUser = currentUserId && (viewUserId === currentUserId || viewUserId?.toString() === currentUserId.toString());
-                    return (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                          // Double check before calling handler
-                          if (isViewingCurrentUser) {
-                            setToast({
-                              message: 'You cannot edit your own account.',
-                              type: 'error',
-                            });
-                            return;
-                          }
-                          
-                          setShowViewModal(false);
-                          handleEdit(viewUserDetails);
-                        }}
-                        disabled={isViewingCurrentUser}
-                        title={isViewingCurrentUser ? "You cannot edit your own account" : "Edit user"}
-                        className={`px-3 py-1.5 text-sm rounded-md shadow-sm hover:shadow-md transition-shadow ${
-                          isViewingCurrentUser
-                            ? 'bg-gray-400 dark:bg-gray-600 text-white cursor-not-allowed opacity-50 pointer-events-none'
-                            : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
-                        }`}
-                        style={isViewingCurrentUser ? { pointerEvents: 'none' } : {}}
-                      >
-                        Edit User
-                      </button>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

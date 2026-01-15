@@ -51,7 +51,34 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Role-based authorization
+// Permission-based authorization (preferred)
+exports.requirePermission = (...permissions) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Not authorized',
+      });
+    }
+
+    const { hasPermission } = require('../permissions');
+    
+    // User must have at least one of the required permissions
+    const isAuthorized = permissions.some(permission => hasPermission(req.user, permission));
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        error: `Permission denied. Required: ${permissions.join(' or ')}`,
+      });
+    }
+
+    next();
+  };
+};
+
+// Role-based authorization (deprecated - use requirePermission instead)
+// Kept for backward compatibility during migration
 exports.authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {

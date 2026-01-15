@@ -3,7 +3,7 @@ import { Button } from './ui';
 import ThemeToggle from './ThemeToggle';
 import authService from '../services/authService';
 import { useEffect, useState } from 'react';
-import { isAdmin } from '../utils/roleHelpers';
+import { isAdmin } from '../utils/permissions';
 
 const NotFound = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import roleService from '../../../services/roleService';
-import Button from '../../ui/Button';
-import Input from '../../ui/Input';
-import Label from '../../ui/Label';
+import authService from '../../../services/authService';
 import Toast from '../../ui/Toast';
+import { Modal, Badge, Button, PermissionButton, FormField, Input, DropdownMenu } from '../../ui';
 import RoleStats from './RoleStats';
 import RoleFilters from './RoleFilters';
 import UserStack from './UserStack';
@@ -27,7 +26,6 @@ const Roles = () => {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState({});
 
   // Filter and sort state
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,16 +74,6 @@ const Roles = () => {
     fetchRoles();
   }, [fetchRoles]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (openDropdown && !event.target.closest('.dropdown-container')) {
-        setOpenDropdown(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openDropdown]);
 
   // Filter and sort roles
   const filteredAndSortedRoles = useMemo(() => {
@@ -383,9 +371,12 @@ const Roles = () => {
           Role-Based Access Control (RBAC)
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
+          <PermissionButton
+            user={authService.getStoredUser()}
+            permission="roles:create"
             onClick={handleCreate}
-            className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-1.5 shadow-sm hover:shadow-md"
+            size="sm"
+            className="flex items-center gap-1.5"
           >
             <svg
               className="w-4 h-4"
@@ -402,7 +393,7 @@ const Roles = () => {
             </svg>
             <span className="hidden sm:inline">Create Role</span>
             <span className="sm:hidden">Create</span>
-          </button>
+          </PermissionButton>
         </div>
       </div>
 
@@ -467,15 +458,9 @@ const Roles = () => {
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-gray-900 dark:text-slate-100 flex items-center gap-2">
                               {role.name}
-                              {isSystem ? (
-                                <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                                  System
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                                  Custom
-                                </span>
-                              )}
+                              <Badge variant={isSystem ? 'info' : 'success'} size="sm">
+                                {isSystem ? 'System' : 'Custom'}
+                              </Badge>
                             </div>
                             {/* Mobile: Show description inline */}
                             <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -507,178 +492,138 @@ const Roles = () => {
                         {formatDate(role.createdAt)}
                       </td>
                       <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-sm font-medium relative">
-                        <div className="relative dropdown-container">
-                          <button
-                            data-role-id={roleId}
-                            onClick={(e) => {
-                              if (openDropdown === roleId) {
-                                setOpenDropdown(null);
-                              } else {
-                                // Calculate if dropdown should open upward
-                                const buttonRect = e.currentTarget.getBoundingClientRect();
-                                const spaceBelow = window.innerHeight - buttonRect.bottom;
-                                const spaceAbove = buttonRect.top;
-                                // System roles have 1 item, custom roles have 3 items
-                                const dropdownHeight = isSystem ? 50 : 150;
-                                
-                                const openUpward = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
-                                setDropdownPosition({ [roleId]: openUpward ? 'top' : 'bottom' });
-                                setOpenDropdown(roleId);
-                              }
-                            }}
-                            className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-                            title="Actions"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                        <DropdownMenu
+                          isOpen={openDropdown === roleId}
+                          onClose={() => setOpenDropdown(null)}
+                          trigger={
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (openDropdown === roleId) {
+                                  setOpenDropdown(null);
+                                } else {
+                                  setOpenDropdown(roleId);
+                                }
+                              }}
+                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+                              title="Actions"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
-                              />
-                            </svg>
-                          </button>
-                          
-                          {/* Dropdown Menu */}
-                          {openDropdown === roleId && (
-                            <div 
-                              className={`fixed w-40 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-gray-200 dark:border-slate-700 z-[100] py-1 ${
-                                dropdownPosition[roleId] === 'top' 
-                                  ? 'animate-[fadeIn_0.2s_ease-out_forwards,slideUp_0.2s_ease-out_forwards]' 
-                                  : 'animate-[fadeIn_0.2s_ease-out_forwards,slideDown_0.2s_ease-out_forwards]'
-                              }`}
-                              style={{
-                                left: `${(() => {
-                                  const button = document.querySelector(`[data-role-id="${roleId}"]`);
-                                  return button ? button.getBoundingClientRect().left : 0;
-                                })()}px`,
-                                [dropdownPosition[roleId] === 'top' ? 'bottom' : 'top']: `${(() => {
-                                  const button = document.querySelector(`[data-role-id="${roleId}"]`);
-                                  if (button) {
-                                    const rect = button.getBoundingClientRect();
-                                    return dropdownPosition[roleId] === 'top' 
-                                      ? `${window.innerHeight - rect.top + 4}px`
-                                      : `${rect.bottom + 4}px`;
-                                  }
-                                  return '0px';
-                                })()}`
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
+                                />
+                              </svg>
+                            </button>
+                          }
+                        >
+                          {/* System Roles: Show only View Permissions */}
+                          {isSystem ? (
+                            <DropdownMenu.Item
+                              onClick={() => {
+                                handleViewPermissions(role);
+                                setOpenDropdown(null);
                               }}
                             >
-                              {/* System Roles: Show only View Permissions */}
-                              {isSystem ? (
-                                <button
-                                  onClick={() => handleViewPermissions(role)}
-                                  className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-2"
-                                  title="View permissions for this system role"
+                              <svg
+                                className="w-4 h-4 text-gray-600 dark:text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                              </svg>
+                              <span>View Permissions</span>
+                            </DropdownMenu.Item>
+                          ) : (
+                            <>
+                              <DropdownMenu.Item
+                                onClick={() => {
+                                  handleEdit(role);
+                                  setOpenDropdown(null);
+                                }}
+                              >
+                                <svg
+                                  className="w-4 h-4 text-gray-600 dark:text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
                                 >
-                                  <svg
-                                    className="w-4 h-4 text-gray-600 dark:text-gray-400"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                    />
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                    />
-                                  </svg>
-                                  <span>View Permissions</span>
-                                </button>
-                              ) : (
-                                /* Custom Roles: Show Edit, Duplicate, Delete */
-                                <>
-                                  {/* Edit */}
-                                  <button
-                                    onClick={() => handleEdit(role)}
-                                    className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-2"
-                                    title="Edit role"
-                                  >
-                                    <svg
-                                      className="w-4 h-4 text-gray-600 dark:text-gray-400"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                      />
-                                    </svg>
-                                    <span>Edit</span>
-                                  </button>
-                                  
-                                  {/* Duplicate */}
-                                  <button
-                                    onClick={() => handleDuplicate(role)}
-                                    className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-2"
-                                    title="Duplicate this role"
-                                  >
-                                    <svg
-                                      className="w-4 h-4 text-gray-600 dark:text-gray-400"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                      />
-                                    </svg>
-                                    <span>Duplicate</span>
-                                  </button>
-                                  
-                                  {/* Delete */}
-                                  <button
-                                    onClick={() => handleDelete(role)}
-                                    disabled={(role.userCount || 0) > 0}
-                                    className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
-                                      (role.userCount || 0) > 0
-                                        ? 'text-gray-400 dark:text-gray-500 opacity-50 cursor-not-allowed'
-                                        : 'text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
-                                    }`}
-                                    title={
-                                      (role.userCount || 0) > 0
-                                        ? `Cannot delete role with ${role.userCount} user(s)`
-                                        : 'Delete role'
-                                    }
-                                  >
-                                    <svg
-                                      className={`w-4 h-4 ${(role.userCount || 0) > 0 ? 'text-gray-400 dark:text-gray-500' : 'text-red-600 dark:text-red-400'}`}
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                      />
-                                    </svg>
-                                    <span>Delete</span>
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                                <span>Edit</span>
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                onClick={() => {
+                                  handleDuplicate(role);
+                                  setOpenDropdown(null);
+                                }}
+                              >
+                                <svg
+                                  className="w-4 h-4 text-gray-600 dark:text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                  />
+                                </svg>
+                                <span>Duplicate</span>
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                onClick={() => {
+                                  handleDelete(role);
+                                  setOpenDropdown(null);
+                                }}
+                                disabled={(role.userCount || 0) > 0}
+                                variant={(role.userCount || 0) > 0 ? 'default' : 'danger'}
+                              >
+                                <svg
+                                  className={`w-4 h-4 ${(role.userCount || 0) > 0 ? 'text-gray-400 dark:text-gray-500' : 'text-red-600 dark:text-red-400'}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                                <span>Delete</span>
+                              </DropdownMenu.Item>
+                            </>
                           )}
-                        </div>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   );
@@ -690,112 +635,100 @@ const Roles = () => {
       </div>
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
-                Create New Role
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form onSubmit={handleSubmitCreate}>
-              <div className="mb-4">
-                <Label htmlFor="create-name">Role Name *</Label>
-                <Input
-                  id="create-name"
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="e.g., Support Staff, Editor"
-                  required
-                  className={formErrors.name ? 'border-red-500' : ''}
-                />
-                {formErrors.name && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {formErrors.name}
-                  </p>
-                )}
-              </div>
-              <div className="mb-6">
-                <Label htmlFor="create-description">Description</Label>
-                <Input
-                  id="create-description"
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="Brief description of the role"
-                />
-              </div>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  disabled={submitting}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    'Create Role'
-                  )}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create New Role"
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="create-role-form"
+              disabled={submitting}
+              loading={submitting}
+            >
+              {submitting ? 'Creating...' : 'Create Role'}
+            </Button>
+          </>
+        }
+      >
+        <form id="create-role-form" onSubmit={handleSubmitCreate}>
+          <div className="space-y-4">
+            <FormField
+              label="Role Name"
+              required
+              error={formErrors.name}
+            >
+              <Input
+                name="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="e.g., Support Staff, Editor"
+                required
+                className={formErrors.name ? 'border-red-500' : ''}
+              />
+            </FormField>
+            <FormField label="Description">
+              <Input
+                name="description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="Brief description of the role"
+              />
+            </FormField>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Edit Modal */}
-      {showEditModal && selectedRole && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
-                Edit Role
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowEditModal(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                aria-label="Close"
+      <Modal
+        isOpen={showEditModal && !!selectedRole}
+        onClose={() => setShowEditModal(false)}
+        title="Edit Role"
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEditModal(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="edit-role-form"
+              disabled={submitting}
+              loading={submitting}
+            >
+              {submitting ? 'Updating...' : 'Update Role'}
+            </Button>
+          </>
+        }
+      >
+        {selectedRole && (
+          <form id="edit-role-form" onSubmit={handleSubmitEdit}>
+            <div className="space-y-4">
+              <FormField
+                label="Role Name"
+                required
+                error={formErrors.name}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form onSubmit={handleSubmitEdit}>
-              <div className="mb-4">
-                <Label htmlFor="edit-name">Role Name *</Label>
                 <Input
-                  id="edit-name"
                   name="name"
                   value={formData.name}
                   onChange={(e) =>
@@ -806,16 +739,9 @@ const Roles = () => {
                   disabled={isSystemRole(selectedRole.name) && selectedRole.name.toLowerCase() === 'admin'}
                   className={formErrors.name ? 'border-red-500' : ''}
                 />
-                {formErrors.name && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {formErrors.name}
-                  </p>
-                )}
-              </div>
-              <div className="mb-6">
-                <Label htmlFor="edit-description">Description</Label>
+              </FormField>
+              <FormField label="Description">
                 <Input
-                  id="edit-description"
                   name="description"
                   value={formData.description}
                   onChange={(e) =>
@@ -823,91 +749,57 @@ const Roles = () => {
                   }
                   placeholder="Brief description of the role"
                 />
-              </div>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  disabled={submitting}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-3 py-1.5 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Updating...</span>
-                    </>
-                  ) : (
-                    'Update Role'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              </FormField>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && selectedRole && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">
-              Delete Role
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete the role "{selectedRole.name}"?
-              {selectedRole.userCount > 0 && (
-                <span className="block mt-2 text-red-600 dark:text-red-400 font-medium">
-                  This role is assigned to {selectedRole.userCount} user(s). You
-                  must reassign these users before deleting the role.
-                </span>
-              )}
-              {isSystemRole(selectedRole.name) && (
-                <span className="block mt-2 text-red-600 dark:text-red-400 font-medium">
-                  System roles cannot be deleted.
-                </span>
-              )}
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={submitting}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={submitting || selectedRole.userCount > 0 || isSystemRole(selectedRole.name)}
-                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  'Delete Role'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showDeleteModal && !!selectedRole}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Role"
+        size="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteModal(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={submitting || (selectedRole && (selectedRole.userCount > 0 || isSystemRole(selectedRole.name)))}
+              variant="danger"
+              loading={submitting}
+            >
+              {submitting ? 'Deleting...' : 'Delete Role'}
+            </Button>
+          </>
+        }
+      >
+        {selectedRole && (
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Are you sure you want to delete the role "{selectedRole.name}"?
+            {selectedRole.userCount > 0 && (
+              <span className="block mt-2 text-red-600 dark:text-red-400 font-medium">
+                This role is assigned to {selectedRole.userCount} user(s). You
+                must reassign these users before deleting the role.
+              </span>
+            )}
+            {isSystemRole(selectedRole.name) && (
+              <span className="block mt-2 text-red-600 dark:text-red-400 font-medium">
+                System roles cannot be deleted.
+              </span>
+            )}
+          </p>
+        )}
+      </Modal>
 
       {/* Permissions Matrix Modal */}
       {showPermissionsModal && selectedRole && (

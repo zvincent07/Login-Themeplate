@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
 import { Input, Button, Label } from './ui';
 import ThemeToggle from './ThemeToggle';
-import { isAdmin } from '../utils/roleHelpers';
+import { isAdmin } from '../utils/permissions';
 
 const VerifyOTP = () => {
   const navigate = useNavigate();

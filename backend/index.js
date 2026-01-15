@@ -10,8 +10,11 @@ const { apiLimiter } = require('./src/middleware/rateLimiter');
 const logger = require('./src/utils/logger');
 require('./src/config/passport');
 
-// Connect to database
-connectDB();
+// Connect to database (non-blocking - server will start even if DB connection fails in development)
+connectDB().catch((error) => {
+  // Error already logged in connectDB
+  // In development, server continues; in production, process.exit(1) is called
+});
 
 // Seed database on startup (only in development or if SEED_DB=true)
 if (process.env.SEED_DB === 'true' || config.nodeEnv === 'development') {
