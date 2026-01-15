@@ -1,6 +1,6 @@
 # RBAC Authentication System - MERN Stack
 
-A complete Role-Based Access Control (RBAC) authentication system with Google OAuth and Email OTP verification.
+A comprehensive, production-ready Role-Based Access Control (RBAC) authentication system with Google OAuth, Email OTP verification, and a full-featured admin dashboard.
 
 ## 🎯 Features
 
@@ -37,8 +37,102 @@ A complete Role-Based Access Control (RBAC) authentication system with Google OA
 - ✅ Cursor movement-based bot detection with IP banning
 - ✅ Password hashing with bcrypt
 - ✅ JWT token authentication
-- ✅ Role-based access control (RBAC)
+- ✅ Permission-based access control (PBAC) - Granular permissions system
+- ✅ Role-based access control (RBAC) - Role hierarchy
 - ✅ Protected routes with middleware
+- ✅ IP whitelisting/blacklisting
+- ✅ Session management
+- ✅ Audit logging for all critical actions
+- ✅ Two-factor authentication (2FA/MFA) support
+
+### Admin Dashboard Features
+
+A comprehensive admin dashboard with organized navigation:
+
+#### Main
+- **Dashboard** - Overview with statistics and key metrics
+- **CMS** - Content Management System for public-facing content
+
+#### Access Control
+- **Users** - Complete user management (create, edit, delete, activate/deactivate, bulk operations)
+- **Roles** - Role-based access control management
+- **Permissions** - Granular permission management
+- **Sessions** - Active session monitoring and management
+- **Impersonation** - User impersonation for support/debugging
+
+#### Security
+- **2FA/MFA** - Two-factor authentication configuration
+- **IP Management** - IP whitelisting and blacklisting
+- **Audit Logs** - Comprehensive audit trail with IP and user agent tracking
+
+#### System Health
+- **Alerts** - System alerts and notifications
+- **Error Logs** - Application error tracking
+- **Maintenance Mode** - System maintenance controls
+- **Job Queues** - Background job management
+
+#### Settings
+- **General Settings** - Site configuration, SEO, timezone, mail settings, white labeling
+- **Billing** - Subscription plans, transactions, invoices, coupons
+- **Email Templates** - Customizable transactional email templates
+- **Backups & Cache** - Database backups and cache management
+
+#### Developer Tools
+- **Feature Flags** - Feature toggle management
+- **API Management** - API endpoint documentation and testing
+- **Global Variables** - System-wide configuration variables
+- **Export/Import** - Data export and import utilities
+- **Version Display** - Application version information
+
+### Frontend Architecture
+
+#### Reusable Components
+- **Modal** - Consistent modal dialogs with keyboard support
+- **Table** - Data tables with sorting, filtering, and selection
+- **FormField** - Standardized form field wrapper
+- **Badge** - Status and category badges
+- **Card** - Content card components
+- **DropdownMenu** - Context menus and dropdowns
+- **PasswordInput** - Password input with visibility toggle
+- **Pagination** - Page navigation component
+- **Button** - Consistent button styling
+- **PermissionGate** - Conditional rendering based on permissions
+- **PermissionButton** - Permission-aware buttons
+
+#### Custom Hooks
+- **useOptimisticUpdate** - Optimistic UI updates with automatic rollback
+- **useUserManagement** - User CRUD operations
+- **useUserFilters** - User filtering and pagination
+- **useUserSessions** - Session management
+
+#### Optimistic UI
+- Instant feedback on user actions
+- Automatic rollback on errors
+- Consistent UX across all mutations
+
+### Backend Architecture
+
+#### Repository Pattern
+- **userRepository** - User data access
+- **roleRepository** - Role data access
+- **sessionRepository** - Session data access
+- **auditLogRepository** - Audit log data access
+- **bannedIPRepository** - IP management
+- **loginAttemptRepository** - Login attempt tracking
+- **permissionRepository** - Permission data access
+
+#### Service Layer
+- **userService** - User business logic
+- **authService** - Authentication logic
+- **roleService** - Role management
+- **auditLogService** - Audit logging
+- **dashboardService** - Dashboard statistics
+- **chatbotService** - AI chatbot integration
+
+#### API Versioning
+- All APIs use `/api/v1/` prefix
+- Backward compatibility maintained
+- Clean separation of concerns
 
 ## 🚀 Quick Start
 
@@ -108,34 +202,74 @@ After seeding, login with:
 
 ## 📡 API Endpoints
 
-### Authentication (`/api/auth`)
+All endpoints use `/api/v1/` prefix for versioning.
 
-- `POST /api/auth/register` - Register new user (creates 'user' role, sends OTP)
-- `POST /api/auth/login` - Login user (requires verified email)
-- `POST /api/auth/verify-otp` - Verify OTP and activate account
-- `POST /api/auth/resend-otp` - Resend OTP code
-- `GET /api/auth/me` - Get current user (protected)
-- `POST /api/auth/logout` - Logout user (protected)
-- `GET /api/auth/google` - Initiate Google OAuth
-- `GET /api/auth/google/callback` - Google OAuth callback
+### Authentication (`/api/v1/auth`)
 
-### Users (`/api/users`)
+- `POST /api/v1/auth/register` - Register new user (creates 'user' role, sends OTP)
+- `POST /api/v1/auth/login` - Login user (requires verified email)
+- `POST /api/v1/auth/verify-otp` - Verify OTP and activate account
+- `POST /api/v1/auth/resend-otp` - Resend OTP code
+- `GET /api/v1/auth/me` - Get current user (protected)
+- `POST /api/v1/auth/logout` - Logout user (protected)
+- `GET /api/v1/auth/google` - Initiate Google OAuth
+- `GET /api/v1/auth/google/callback` - Google OAuth callback
+- `POST /api/v1/auth/forgot-password` - Request password reset
+- `POST /api/v1/auth/reset-password` - Reset password with token
 
-- `GET /api/users` - Get all users (admin only)
-- `GET /api/users/:id` - Get single user (protected)
-- `POST /api/users/employees` - Create employee (admin only)
-- `PUT /api/users/:id` - Update user (protected)
-- `DELETE /api/users/:id` - Delete user (admin only)
+### Users (`/api/v1/users`)
+
+- `GET /api/v1/users` - Get all users (permission: `users:read`)
+- `GET /api/v1/users/:id` - Get single user (permission: `users:read`)
+- `POST /api/v1/users` - Create user (permission: `users:create`)
+- `PUT /api/v1/users/:id` - Update user (permission: `users:update`)
+- `DELETE /api/v1/users/:id` - Delete user (permission: `users:delete`)
+- `POST /api/v1/users/:id/restore` - Restore deleted user (permission: `users:restore`)
+- `GET /api/v1/users/stats` - Get user statistics (permission: `dashboard:view`)
+- `GET /api/v1/users/:id/sessions` - Get user sessions (permission: `users:view-sessions`)
+- `DELETE /api/v1/users/:id/sessions/:sessionId` - Terminate session (permission: `users:terminate-sessions`)
+
+### Roles (`/api/v1/roles`)
+
+- `GET /api/v1/roles` - Get all roles (permission: `roles:read`)
+- `GET /api/v1/roles/:id` - Get single role (permission: `roles:read`)
+- `POST /api/v1/roles` - Create role (permission: `roles:create`)
+- `PUT /api/v1/roles/:id` - Update role (permission: `roles:update`)
+- `DELETE /api/v1/roles/:id` - Delete role (permission: `roles:delete`)
+- `PUT /api/v1/roles/:id/permissions` - Update role permissions (permission: `roles:update`)
+
+### Audit Logs (`/api/v1/audit-logs`)
+
+- `GET /api/v1/audit-logs` - Get audit logs (permission: `audit-logs:read`)
+- `GET /api/v1/audit-logs/:id` - Get single audit log (permission: `audit-logs:read`)
+
+### Dashboard (`/api/v1/dashboard`)
+
+- `GET /api/v1/dashboard/stats` - Get dashboard statistics (permission: `dashboard:view`)
+
+All endpoints use permission-based authorization. See [backend/README.md](./backend/README.md) for complete API documentation.
 
 ## 🎨 Frontend Features
 
+### User Interface
 - Modern, sleek login/register UI
 - Real-time password strength indicator
 - OTP verification screen
 - Cursor movement tracking for bot detection
 - Responsive design (mobile-friendly)
-- Dark mode support
-- Black, white, gray color theme
+- Dark mode support with theme toggle
+- Consistent design system with reusable components
+
+### Admin Dashboard
+- Comprehensive admin interface with organized navigation
+- Permission-aware UI components
+- Optimistic UI updates for instant feedback
+- Advanced filtering and search capabilities
+- Bulk operations support
+- Real-time statistics and metrics
+- Detailed audit trail visualization
+- Session management interface
+- User impersonation capabilities
 
 ## 📝 Environment Variables
 
@@ -198,13 +332,25 @@ VITE_API_BASE_URL=http://localhost:5000/api
 
 ## 📚 Documentation
 
+### Setup & Configuration
 - [docs/SETUP_GUIDE.md](./docs/SETUP_GUIDE.md) - Detailed setup instructions for Google OAuth and Email OTP
 - [docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md) - Testing setup and best practices
+
+### Architecture & Development
+- [docs/CURSOR_RULES_APPLICATION.md](./docs/CURSOR_RULES_APPLICATION.md) - Cursor rules application status
+- [docs/FRONTEND_CURSOR_RULES_APPLICATION.md](./docs/FRONTEND_CURSOR_RULES_APPLICATION.md) - Frontend architecture rules
+- [docs/FINAL_MIGRATION_SUMMARY.md](./docs/FINAL_MIGRATION_SUMMARY.md) - Complete migration summary
+- [docs/REUSABLE_COMPONENTS_GUIDE.md](./docs/REUSABLE_COMPONENTS_GUIDE.md) - Reusable components usage guide
+- [docs/OPTIMISTIC_UI_GUIDE.md](./docs/OPTIMISTIC_UI_GUIDE.md) - Optimistic UI patterns
+
+### API Documentation
+- [backend/README.md](./backend/README.md) - Backend API documentation
+- [frontend/README.md](./frontend/README.md) - Frontend documentation
+
+### Additional Resources
 - [docs/TYPESCRIPT_MIGRATION.md](./docs/TYPESCRIPT_MIGRATION.md) - TypeScript migration guide
 - [docs/IMPROVEMENTS.md](./docs/IMPROVEMENTS.md) - Code improvements summary
 - [docs/PROJECT_ANALYSIS.md](./docs/PROJECT_ANALYSIS.md) - Comprehensive project analysis
-- [backend/README.md](./backend/README.md) - Backend API documentation
-- [frontend/README.md](./frontend/README.md) - Frontend documentation
 
 ## 🔒 Security Notes
 
@@ -215,6 +361,62 @@ VITE_API_BASE_URL=http://localhost:5000/api
 - Strong password requirements enforced
 - Cursor movement-based bot detection with IP banning
 - Admin account created via secure seeding
+- Permission-based authorization (granular access control)
+- Audit logging for all critical actions
+- IP and User Agent tracking for security monitoring
+- Session management with termination capabilities
+- Soft delete for data recovery
+
+## 🏗️ Architecture
+
+### Backend Architecture
+- **Repository Pattern** - Data access layer abstraction
+- **Service Layer** - Business logic and permission enforcement
+- **Controller Layer** - Thin controllers (parse request → call service → return response)
+- **Middleware** - Authentication, authorization, validation, error handling
+- **API Versioning** - `/api/v1/` prefix for future compatibility
+
+### Frontend Architecture
+- **Component-Based** - Reusable UI components
+- **Service Layer** - API calls abstracted from components
+- **Custom Hooks** - Business logic and state management
+- **Permission System** - Frontend permission checks mirror backend
+- **Optimistic UI** - Instant feedback with automatic rollback
+
+### Code Quality
+- Consistent coding standards enforced via `.cursorrules`
+- Separation of concerns (components, services, hooks)
+- No direct API calls in components
+- Business logic in services/hooks
+- Permission-aware components
+- Comprehensive error handling
+
+## 🚦 Project Status
+
+✅ **Production Ready** - All core features implemented and tested
+
+### Completed Features
+- ✅ Authentication system (Email/Password, Google OAuth, OTP)
+- ✅ Permission-based access control
+- ✅ Complete admin dashboard
+- ✅ User management with bulk operations
+- ✅ Role and permission management
+- ✅ Audit logging system
+- ✅ Session management
+- ✅ Reusable component library
+- ✅ Optimistic UI patterns
+- ✅ API versioning (v1)
+- ✅ Repository pattern implementation
+- ✅ Service layer architecture
+
+### Future Enhancements
+- 🔄 General Settings implementation
+- 🔄 Billing system implementation
+- 🔄 Email template editor
+- 🔄 Backup management system
+- 🔄 CMS content editor
+- 🔄 Feature flags implementation
+- 🔄 API documentation interface
 
 ## 📄 License
 
