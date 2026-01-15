@@ -82,6 +82,7 @@ General:
 - No logic-heavy JSX
 - Business logic lives in hooks or services
 - Shared UI lives in /components/ui
+- Creating reusable components for repeating patterns: ANY repeated UI or logic pattern MUST be extracted into a reusable component or hook
 
 MANDATORY COMPONENTS:
 - Buttons
