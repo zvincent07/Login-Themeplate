@@ -5,9 +5,9 @@ const RoleStats = ({ stats, loading, onCreateClick }) => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700 animate-pulse">
-            <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-24 mb-2"></div>
-            <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded w-16"></div>
+          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 animate-pulse">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
           </div>
         ))}
       </div>
@@ -17,10 +17,10 @@ const RoleStats = ({ stats, loading, onCreateClick }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       {/* Total Roles */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Roles</p>
+            <p className="text-sm text-gray-600 dark:text-gray-200">Total Roles</p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">
               {stats?.total || 0}
             </p>
@@ -44,10 +44,10 @@ const RoleStats = ({ stats, loading, onCreateClick }) => {
       </div>
 
       {/* System Roles */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">System Roles</p>
+            <p className="text-sm text-gray-600 dark:text-gray-200">System Roles</p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">
               {stats?.systemRoles || 0}
             </p>
@@ -72,13 +72,13 @@ const RoleStats = ({ stats, loading, onCreateClick }) => {
 
       {/* Custom Roles */}
       <div 
-        className={`bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700 ${onCreateClick ? 'cursor-pointer hover:border-green-300 dark:hover:border-green-700 hover:shadow-md transition-all duration-200 group' : ''}`}
+        className={`bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 ${onCreateClick ? 'cursor-pointer hover:border-green-300 dark:hover:border-green-700 hover:shadow-md transition-all duration-200 group' : ''}`}
         onClick={onCreateClick}
         title={onCreateClick ? 'Click to create a new custom role' : ''}
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Custom Roles</p>
+            <p className="text-sm text-gray-600 dark:text-gray-200">Custom Roles</p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">
               {stats?.customRoles || 0}
             </p>

@@ -2,16 +2,19 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import roleService from '../../../services/roleService';
 import authService from '../../../services/authService';
 import Toast from '../../ui/Toast';
-import { Modal, Badge, Button, PermissionButton, FormField, Input, DropdownMenu } from '../../ui';
+import { Modal, Badge, Button, PermissionButton, FormField, Input, DropdownMenu, Table, Pagination } from '../../ui';
 import RoleStats from './RoleStats';
 import RoleFilters from './RoleFilters';
 import UserStack from './UserStack';
 import PermissionsMatrix from './PermissionsMatrix';
 
+const PAGE_SIZE = 10;
+
 const Roles = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Track if we have successfully loaded data at least once
   const hasLoadedData = useRef(false);
@@ -119,10 +122,28 @@ const Roles = () => {
     return sorted;
   }, [roles, searchTerm, sortBy, sortOrder]);
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredAndSortedRoles.length / PAGE_SIZE);
+  
+  const paginatedRoles = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredAndSortedRoles.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredAndSortedRoles, currentPage]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortBy, sortOrder]);
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
   // Check if role is system role
   const isSystemRole = (roleName) => {
-    const systemRoles = ['admin', 'user', 'super admin', 'employee'];
-    return systemRoles.includes(roleName.toLowerCase());
+    // Hybrid Model: Only Super Admin is immutable
+    return roleName.toLowerCase() === 'super admin';
   };
 
   // Handle create
@@ -357,8 +378,215 @@ const Roles = () => {
     });
   };
 
+  // Define columns for Table component
+  const columns = [
+    {
+      key: 'name',
+      label: 'Name',
+      render: (role) => {
+        const isSystem = isSystemRole(role.name);
+        return (
+          <div className="flex items-center">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                {role.name}
+                <Badge variant={isSystem ? 'info' : 'success'} size="sm">
+                  {isSystem ? 'System' : 'Custom'}
+                </Badge>
+              </div>
+              <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-200">
+                {role.description || (
+                  <span className="italic text-gray-400 dark:text-gray-200">
+                    No description
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      className: 'hidden md:table-cell',
+      render: (role) => (
+        <div className="text-sm text-gray-600 dark:text-gray-200">
+          {role.description || (
+            <span className="italic text-gray-400 dark:text-gray-200">
+              No description
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'users',
+      label: 'Users',
+      render: (role) => (
+        <UserStack 
+          users={role.users || []} 
+          count={role.userCount || 0} 
+        />
+      )
+    },
+    {
+      key: 'createdAt',
+      label: 'Created',
+      className: 'hidden lg:table-cell',
+      render: (role) => (
+        <span className="text-xs text-gray-500 dark:text-gray-200">
+          {formatDate(role.createdAt)}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      align: 'center',
+      render: (role) => {
+        const roleId = role._id || role.id;
+        const isSystem = isSystemRole(role.name);
+        return (
+          <DropdownMenu
+            isOpen={openDropdown === roleId}
+            onClose={() => setOpenDropdown(null)}
+            className="flex justify-center"
+            trigger={
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (openDropdown === roleId) {
+                    setOpenDropdown(null);
+                  } else {
+                    setOpenDropdown(roleId);
+                  }
+                }}
+                className="p-1.5 text-gray-600 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                title="Actions"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
+                  />
+                </svg>
+              </button>
+            }
+          >
+            {/* System Roles: Show only View Permissions */}
+            {isSystem ? (
+              <DropdownMenu.Item
+                onClick={() => {
+                  handleViewPermissions(role);
+                  setOpenDropdown(null);
+                }}
+              >
+                <svg
+                  className="w-4 h-4 text-gray-600 dark:text-gray-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                  />
+                </svg>
+                <span>View Permissions</span>
+              </DropdownMenu.Item>
+            ) : (
+              <>
+                <DropdownMenu.Item
+                  onClick={() => {
+                    handleEdit(role);
+                    setOpenDropdown(null);
+                  }}
+                >
+                  <svg
+                  className="w-4 h-4 text-gray-600 dark:text-gray-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                  <span>Edit Role</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onClick={() => {
+                    handleDuplicate(role);
+                    setOpenDropdown(null);
+                  }}
+                >
+                  <svg
+                  className="w-4 h-4 text-gray-600 dark:text-gray-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span>Duplicate</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onClick={() => {
+                    handleDelete(role);
+                    setOpenDropdown(null);
+                  }}
+                  className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  <span>Delete Role</span>
+                </DropdownMenu.Item>
+              </>
+            )}
+          </DropdownMenu>
+        );
+      }
+    }
+  ];
+
   return (
-    <div>
+    <div className="max-h-[calc(100vh-7rem)] flex flex-col relative">
       {toast && (
         <Toast
           message={toast.message}
@@ -367,7 +595,7 @@ const Roles = () => {
         />
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Role-Based Access Control (RBAC)
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
@@ -411,231 +639,33 @@ const Roles = () => {
       />
 
       {/* Roles Table */}
-      <div className={`bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden ${isRefreshing ? 'opacity-70 transition-opacity' : ''}`}>
-        {loading ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Loading roles...</p>
-          </div>
-        ) : filteredAndSortedRoles.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {searchTerm ? 'No roles found matching your search' : 'No roles found. Create your first role to get started.'}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-              <thead className="bg-gray-50 dark:bg-slate-700">
-                <tr>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
-                    Description
-                  </th>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Users
-                  </th>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">
-                    Created
-                  </th>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                {filteredAndSortedRoles.map((role) => {
-                  const roleId = role._id || role.id;
-                  const isSystem = isSystemRole(role.name);
-                  return (
-                    <tr
-                      key={roleId}
-                      className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <td className="px-2 sm:px-4 py-2.5">
-                        <div className="flex items-center">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100 flex items-center gap-2">
-                              {role.name}
-                              <Badge variant={isSystem ? 'info' : 'success'} size="sm">
-                                {isSystem ? 'System' : 'Custom'}
-                              </Badge>
-                            </div>
-                            {/* Mobile: Show description inline */}
-                            <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {role.description || (
-                                <span className="italic text-gray-400 dark:text-gray-500">
-                                  No description
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 sm:px-4 py-2.5 hidden md:table-cell">
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {role.description || (
-                            <span className="italic text-gray-400 dark:text-gray-500">
-                              No description
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap">
-                        <UserStack 
-                          users={role.users || []} 
-                          count={role.userCount || 0} 
-                        />
-                      </td>
-                      <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 hidden lg:table-cell">
-                        {formatDate(role.createdAt)}
-                      </td>
-                      <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-sm font-medium relative">
-                        <DropdownMenu
-                          isOpen={openDropdown === roleId}
-                          onClose={() => setOpenDropdown(null)}
-                          trigger={
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (openDropdown === roleId) {
-                                  setOpenDropdown(null);
-                                } else {
-                                  setOpenDropdown(roleId);
-                                }
-                              }}
-                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-                              title="Actions"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
-                                />
-                              </svg>
-                            </button>
-                          }
-                        >
-                          {/* System Roles: Show only View Permissions */}
-                          {isSystem ? (
-                            <DropdownMenu.Item
-                              onClick={() => {
-                                handleViewPermissions(role);
-                                setOpenDropdown(null);
-                              }}
-                            >
-                              <svg
-                                className="w-4 h-4 text-gray-600 dark:text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                />
-                              </svg>
-                              <span>View Permissions</span>
-                            </DropdownMenu.Item>
-                          ) : (
-                            <>
-                              <DropdownMenu.Item
-                                onClick={() => {
-                                  handleEdit(role);
-                                  setOpenDropdown(null);
-                                }}
-                              >
-                                <svg
-                                  className="w-4 h-4 text-gray-600 dark:text-gray-400"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                  />
-                                </svg>
-                                <span>Edit</span>
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                onClick={() => {
-                                  handleDuplicate(role);
-                                  setOpenDropdown(null);
-                                }}
-                              >
-                                <svg
-                                  className="w-4 h-4 text-gray-600 dark:text-gray-400"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                  />
-                                </svg>
-                                <span>Duplicate</span>
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                onClick={() => {
-                                  handleDelete(role);
-                                  setOpenDropdown(null);
-                                }}
-                                disabled={(role.userCount || 0) > 0}
-                                variant={(role.userCount || 0) > 0 ? 'default' : 'danger'}
-                              >
-                                <svg
-                                  className={`w-4 h-4 ${(role.userCount || 0) > 0 ? 'text-gray-400 dark:text-gray-500' : 'text-red-600 dark:text-red-400'}`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                                <span>Delete</span>
-                              </DropdownMenu.Item>
-                            </>
-                          )}
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className={`flex-1 flex flex-col min-h-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden ${isRefreshing ? 'opacity-70 transition-opacity' : ''}`}>
+        <Table
+          columns={columns}
+          data={paginatedRoles}
+          loading={loading}
+          emptyMessage={
+            searchTerm
+              ? 'No roles found matching your search'
+              : 'No roles found. Create your first role to get started.'
+          }
+          className="flex-1"
+        />
+
+        {/* Pagination - Only show if totalPages > 1 */}
+        {totalPages > 1 && (
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              loading={loading || isRefreshing}
+            />
           </div>
         )}
       </div>
 
-      {/* Create Modal */}
-      <Modal
+      {/* Create Modal */}    <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Create New Role"
@@ -784,7 +814,7 @@ const Roles = () => {
         }
       >
         {selectedRole && (
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-gray-600 dark:text-gray-200 mb-6">
             Are you sure you want to delete the role "{selectedRole.name}"?
             {selectedRole.userCount > 0 && (
               <span className="block mt-2 text-red-600 dark:text-red-400 font-medium">

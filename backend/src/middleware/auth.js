@@ -23,8 +23,16 @@ exports.protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, config.jwtSecret);
 
-    // Get user from token
-    req.user = await User.findById(decoded.id).select('-password').populate('role');
+    // Get user from token with deep population for permissions
+    req.user = await User.findById(decoded.id)
+      .select('-password')
+      .populate({
+        path: 'role',
+        populate: {
+          path: 'permissions',
+          model: 'Permission'
+        }
+      });
 
     if (!req.user) {
       return res.status(401).json({

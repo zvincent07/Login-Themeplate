@@ -10,6 +10,7 @@
 const roleService = require('../roleService');
 const roleRepository = require('../../repositories/roleRepository');
 const permissionRepository = require('../../repositories/permissionRepository');
+const userRepository = require('../../repositories/userRepository');
 const { requirePermission } = require('../../permissions');
 
 jest.mock('../../repositories/roleRepository');
@@ -18,6 +19,11 @@ jest.mock('../../repositories/userRepository');
 jest.mock('../../permissions');
 jest.mock('../../utils/auditLogger', () => ({
   createAuditLog: jest.fn(),
+}));
+
+// Mock Mongoose models if needed for populate
+jest.mock('../../models/Permission', () => ({
+  populate: jest.fn().mockImplementation((doc) => doc),
 }));
 
 describe('RoleService', () => {
@@ -32,6 +38,8 @@ describe('RoleService', () => {
 
       requirePermission.mockImplementation(() => {});
       roleRepository.findAll.mockResolvedValue(mockRoles);
+      userRepository.countByRole.mockResolvedValue(0); // Mock user count
+      userRepository.findByRole.mockResolvedValue([]); // Mock sample users
 
       await roleService.getRoles(mockActor);
 
@@ -71,9 +79,9 @@ describe('RoleService', () => {
   });
 
   describe('updateRole', () => {
-    it('should prevent updating system roles', async () => {
+    it('should prevent updating Super Admin', async () => {
       const mockActor = { id: 'actor123', roleName: 'admin' };
-      const systemRole = { _id: 'role123', name: 'admin' };
+      const systemRole = { _id: 'role123', name: 'Super Admin' };
 
       requirePermission.mockImplementation(() => {});
       roleRepository.findById.mockResolvedValue(systemRole);
@@ -82,12 +90,27 @@ describe('RoleService', () => {
         roleService.updateRole('role123', { name: 'newadmin' }, mockActor)
       ).rejects.toThrow('Cannot update system role');
     });
+
+    it('should ALLOW updating Admin (Hybrid Model)', async () => {
+      const mockActor = { id: 'actor123', roleName: 'super admin' };
+      const adminRole = { _id: 'role123', name: 'admin', description: 'Old desc' };
+      const updatedRole = { ...adminRole, description: 'New desc' };
+
+      requirePermission.mockImplementation(() => {});
+      roleRepository.findById.mockResolvedValue(adminRole);
+      roleRepository.updateById.mockResolvedValue(updatedRole);
+      userRepository.count.mockResolvedValue(0);
+
+      const result = await roleService.updateRole('role123', { description: 'New desc' }, mockActor);
+      
+      expect(result.description).toBe('New desc');
+    });
   });
 
   describe('deleteRole', () => {
-    it('should prevent deleting system roles', async () => {
+    it('should prevent deleting Super Admin', async () => {
       const mockActor = { id: 'actor123' };
-      const systemRole = { _id: 'role123', name: 'admin' };
+      const systemRole = { _id: 'role123', name: 'super admin' };
 
       requirePermission.mockImplementation(() => {});
       roleRepository.findById.mockResolvedValue(systemRole);
@@ -97,14 +120,27 @@ describe('RoleService', () => {
       ).rejects.toThrow('Cannot delete system role');
     });
 
+    it('should ALLOW deleting Admin if no users (Hybrid Model)', async () => {
+        const mockActor = { id: 'actor123' };
+        const adminRole = { _id: 'role123', name: 'admin' };
+  
+        requirePermission.mockImplementation(() => {});
+        roleRepository.findById.mockResolvedValue(adminRole);
+        userRepository.countByRole.mockResolvedValue(0); // No users
+        roleRepository.deleteById.mockResolvedValue({});
+  
+        await roleService.deleteRole('role123', mockActor);
+        
+        expect(roleRepository.deleteById).toHaveBeenCalledWith('role123');
+      });
+
     it('should prevent deleting role with assigned users', async () => {
       const mockActor = { id: 'actor123' };
       const role = { _id: 'role123', name: 'custom' };
-      const User = require('../../models/User');
 
       requirePermission.mockImplementation(() => {});
       roleRepository.findById.mockResolvedValue(role);
-      User.countDocuments.mockResolvedValue(5); // 5 users assigned
+      userRepository.countByRole.mockResolvedValue(5); // 5 users assigned
 
       await expect(
         roleService.deleteRole('role123', mockActor)

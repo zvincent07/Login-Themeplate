@@ -54,11 +54,11 @@ const Table = ({
 
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-        <thead className={`bg-gray-50 dark:bg-slate-700 ${headerClassName}`}>
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className={`bg-gray-50 dark:bg-gray-700 ${headerClassName}`}>
           <tr>
             {selectable && (
-              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-12">
+              <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-200 uppercase tracking-wider w-12">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -84,7 +84,7 @@ const Table = ({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           {data.map((row, index) => {
             const isSelected = selectable && selectedRows.includes(row.id || row._id);
             return (
@@ -92,7 +92,7 @@ const Table = ({
                 key={row.id || row._id || index}
                 onClick={() => onRowClick?.(row)}
                 className={`
-                  ${onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700' : ''}
+                  ${onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''}
                   ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
                   ${rowClassName}
                 `}
@@ -113,9 +113,9 @@ const Table = ({
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`px-2 sm:px-4 py-2 whitespace-nowrap ${
+                    className={`px-2 sm:px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white align-middle text-${column.align || 'left'} ${
                       column.hidden ? 'hidden' : column.responsive || ''
-                    }`}
+                    } ${column.className || ''}`}
                   >
                     {column.render ? column.render(row, index) : row[column.key]}
                   </td>

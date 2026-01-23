@@ -77,7 +77,8 @@ const DashboardOverview = () => {
   const CPU_COLORS = ['#3b82f6', '#e2e8f0'];
 
   return (
-    <div>
+    <div className="max-h-[calc(100vh-7rem)] flex flex-col relative">
+      <div className="flex-1 overflow-y-auto pb-20 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-6">
         Dashboard Overview
       </h1>
@@ -215,6 +216,7 @@ const DashboardOverview = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };

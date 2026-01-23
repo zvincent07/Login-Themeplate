@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import UAParser from 'ua-parser-js';
 import auditLogService from '../../../services/auditLogService';
-import { Toast, Badge, Button, Modal, FormField, Input, Pagination } from '../../ui';
+import { Toast, Badge, Button, Modal, FormField, Input, Pagination, Table } from '../../ui';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 12;
 
 const resourceTypeOptions = [
   { value: 'all', label: 'All resources' },
@@ -323,8 +323,98 @@ const AuditLogs = () => {
     }
   };
 
+  const columns = useMemo(() => [
+    {
+      key: 'createdAt',
+      label: 'When',
+      render: (log) => formatTimestamp(log.createdAt),
+    },
+    {
+      key: 'actor',
+      label: 'Actor',
+      render: (log) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-900 dark:text-white">
+            {log.actorName || log.actorEmail || 'System'}
+          </span>
+          {log.actorEmail && (
+            <span className="text-xs text-gray-500 dark:text-gray-200">
+              {log.actorEmail}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'action',
+      label: 'Action',
+      render: (log) => (
+        <Badge variant={getBadgeVariant(log.action)} size="sm">
+          {formatAction(log.action)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'target',
+      label: 'Target',
+      render: (log) => (
+        <span className="text-xs text-gray-700 dark:text-white">
+          {log.resourceName || log.resourceId}
+        </span>
+      ),
+    },
+    {
+      key: 'resource',
+      label: 'Resource',
+      responsive: 'hidden lg:table-cell',
+      render: (log) => (
+        <span className="text-xs text-gray-700 dark:text-white">
+          {formatResourceType(log.resourceType)}
+        </span>
+      ),
+    },
+    {
+      key: 'userAgent',
+      label: 'IP / User Agent',
+      responsive: 'hidden xl:table-cell',
+      render: (log) => {
+        const userAgentInfo = parseUserAgent(log.userAgent);
+        return (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-200">
+            <span>{log.ip || 'Unknown'}</span>
+            {log.userAgent && (
+              <>
+                <span>·</span>
+                <div className="flex items-center gap-1">
+                  {userAgentInfo.icon === 'mobile' && (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                  {userAgentInfo.icon === 'tablet' && (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                  {userAgentInfo.icon === 'desktop' && (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                  <span className="truncate max-w-[150px]" title={userAgentInfo.text}>
+                    {userAgentInfo.text}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [logs]);
+
   return (
-    <div>
+    <div className="max-h-[calc(100vh-7rem)] flex flex-col relative">
       {toast && (
         <Toast
           message={toast.message}
@@ -334,13 +424,13 @@ const AuditLogs = () => {
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Audit Logs
         </h1>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex flex-col sm:flex-row gap-3">
           <FormField label="Search" className="flex-1">
             <Input
@@ -355,7 +445,7 @@ const AuditLogs = () => {
             <select
               value={resourceType}
               onChange={handleResourceTypeChange}
-              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               {resourceTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -369,7 +459,7 @@ const AuditLogs = () => {
             <select
               value={actionFilter}
               onChange={handleActionFilterChange}
-              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               <option value="all">All actions</option>
               {actionOptions
@@ -407,133 +497,26 @@ const AuditLogs = () => {
       </div>
 
       {/* Logs Table */}
-      <div className={`bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden ${isRefreshing ? 'opacity-70 transition-opacity' : ''}`}>
-        {loading && logs.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Loading audit logs...</p>
-          </div>
-        ) : logs.length === 0 && !error ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">No audit entries found for the current filters.</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                <thead className="bg-gray-50 dark:bg-slate-700">
-                  <tr>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      When
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actor
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Action
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Target
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">
-                      Resource
-                    </th>
-                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden xl:table-cell">
-                      IP / User Agent
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                  {!loading &&
-                    logs.map((log) => {
-                      const userAgentInfo = parseUserAgent(log.userAgent);
-                      return (
-                        <tr
-                          key={log._id}
-                          onClick={() => handleRowClick(log)}
-                          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                            {formatTimestamp(log.createdAt)}
-                          </td>
-                          <td className="px-2 sm:px-4 py-2.5">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                                {log.actorName || log.actorEmail || 'System'}
-                              </span>
-                              {log.actorEmail && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {log.actorEmail}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap">
-                            <Badge variant={getBadgeVariant(log.action)} size="sm">
-                              {formatAction(log.action)}
-                            </Badge>
-                          </td>
-                          <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                            {log.resourceName || log.resourceId}
-                          </td>
-                          <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 hidden lg:table-cell">
-                            {formatResourceType(log.resourceType)}
-                          </td>
-                          <td className="px-2 sm:px-4 py-2.5 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 hidden xl:table-cell">
-                            <div className="flex items-center gap-1.5">
-                              <span>{log.ip || 'Unknown'}</span>
-                              {log.userAgent && (
-                                <>
-                                  <span>·</span>
-                                  <div className="flex items-center gap-1">
-                                    {userAgentInfo.icon === 'mobile' && (
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                      </svg>
-                                    )}
-                                    {userAgentInfo.icon === 'tablet' && (
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                      </svg>
-                                    )}
-                                    {userAgentInfo.icon === 'desktop' && (
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                      </svg>
-                                    )}
-                                    <span>{userAgentInfo.text}</span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+      <div className={`flex-1 flex flex-col min-h-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden ${isRefreshing ? 'opacity-70 transition-opacity' : ''}`}>
+        <Table
+          columns={columns}
+          data={logs}
+          loading={loading}
+          emptyMessage={error || "No audit entries found for the current filters."}
+          onRowClick={handleRowClick}
+          className="flex-1"
+        />
 
-                  {!loading && error && (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-4 py-6 text-center text-sm text-red-600 dark:text-red-400"
-                      >
-                        {error}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination - Only show if totalPages > 1 */}
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-                loading={loading}
-              />
-            )}
-          </>
+        {/* Pagination - Only show if totalPages > 1 */}
+        {totalPages > 1 && (
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              loading={loading || isRefreshing}
+            />
+          </div>
         )}
       </div>
 
@@ -551,31 +534,31 @@ const AuditLogs = () => {
           <div className="space-y-6">
               {/* Basic Info */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Event Information
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Event ID</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium font-mono">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Event ID</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium font-mono">
                       {selectedLog._id}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Action</span>
                     <Badge variant={getBadgeVariant(selectedLog.action)} size="sm">
                       {formatAction(selectedLog.action)}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Resource Type</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Resource Type</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium">
                       {formatResourceType(selectedLog.resourceType)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Timestamp</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Timestamp</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium">
                       {formatTimestamp(selectedLog.createdAt)}
                     </span>
                   </div>
@@ -584,19 +567,19 @@ const AuditLogs = () => {
 
               {/* Actor Info */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Actor
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Name</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium">
                       {selectedLog.actorName || 'N/A'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Email</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium">
                       {selectedLog.actorEmail || 'N/A'}
                     </span>
                   </div>
@@ -605,19 +588,19 @@ const AuditLogs = () => {
 
               {/* Target Info */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Target Resource
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Resource ID</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium font-mono break-all text-right max-w-xs">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Resource ID</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium font-mono break-all text-right max-w-xs">
                       {selectedLog.resourceId}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Resource Name</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">Resource Name</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium">
                       {selectedLog.resourceName || 'N/A'}
                     </span>
                   </div>
@@ -627,13 +610,13 @@ const AuditLogs = () => {
               {/* Changes (if available) */}
               {selectedLog.details?.changes && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                     Changes
                   </h3>
-                  <div className="bg-gray-50 dark:bg-slate-900/40 rounded-lg p-4 space-y-3">
+                  <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-4 space-y-3">
                     {Object.entries(selectedLog.details.changes).map(([field, change]) => (
-                      <div key={field} className="border-b border-gray-200 dark:border-slate-700 pb-2 last:border-0 last:pb-0">
-                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <div key={field} className="border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0 last:pb-0">
+                        <div className="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">
                           {field.charAt(0).toUpperCase() + field.slice(1)}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
@@ -653,19 +636,19 @@ const AuditLogs = () => {
 
               {/* Metadata */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Metadata
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">IP Address</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium font-mono">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">IP Address</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium font-mono">
                       {selectedLog.ip || 'Unknown'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">User Agent</span>
-                    <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">
+                    <span className="text-xs text-gray-500 dark:text-gray-200 uppercase tracking-wider">User Agent</span>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium">
                       {selectedLog.userAgent ? parseUserAgentForDrawer(selectedLog.userAgent).display : 'Unknown'}
                     </span>
                   </div>
@@ -675,7 +658,7 @@ const AuditLogs = () => {
               {/* Raw JSON */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                     Raw JSON Payload
                   </h3>
                   <Button
@@ -702,7 +685,7 @@ const AuditLogs = () => {
                     )}
                   </Button>
                 </div>
-                <pre className="bg-gray-50 dark:bg-slate-900/40 rounded-lg p-4 overflow-x-auto text-xs text-gray-800 dark:text-gray-200 font-mono relative">
+                <pre className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-4 overflow-x-auto text-xs text-gray-800 dark:text-gray-200 font-mono relative">
                   {JSON.stringify(selectedLog, null, 2)}
                 </pre>
               </div>

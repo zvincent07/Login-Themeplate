@@ -11,7 +11,7 @@
 const roleRepository = require('../repositories/roleRepository');
 const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
-const { requirePermission } = require('../permissions');
+const { requirePermission, DEFAULT_ROLE_PERMISSIONS } = require('../permissions');
 const { createAuditLog } = require('../utils/auditLogger');
 
 class RoleService {
@@ -48,36 +48,79 @@ class RoleService {
 
   /**
    * Get all permissions (enforces permissions, auto-seeds if empty)
+   * Also ensures Default Roles (Employee, Admin) exist and have permissions
    */
   async getAllPermissions(actor) {
     requirePermission(actor, 'roles:read', 'permissions list');
 
     let permissions = await permissionRepository.findAll();
 
-    // Auto-seed permissions if none exist
+    // 1. Auto-seed permissions if none exist
     if (permissions.length === 0) {
       const seedPermissions = [
-        { name: 'users.create', description: 'Create users', resource: 'users', action: 'create' },
-        { name: 'users.read', description: 'Read users', resource: 'users', action: 'read' },
-        { name: 'users.update', description: 'Update users', resource: 'users', action: 'update' },
-        { name: 'users.delete', description: 'Delete users', resource: 'users', action: 'delete' },
-        { name: 'users.manage', description: 'Manage all users', resource: 'users', action: 'manage' },
-        { name: 'employees.create', description: 'Create employees', resource: 'employees', action: 'create' },
-        { name: 'employees.read', description: 'Read employees', resource: 'employees', action: 'read' },
-        { name: 'employees.update', description: 'Update employees', resource: 'employees', action: 'update' },
-        { name: 'employees.delete', description: 'Delete employees', resource: 'employees', action: 'delete' },
-        { name: 'roles.create', description: 'Create roles', resource: 'roles', action: 'create' },
-        { name: 'roles.read', description: 'Read roles', resource: 'roles', action: 'read' },
-        { name: 'roles.update', description: 'Update roles', resource: 'roles', action: 'update' },
-        { name: 'roles.delete', description: 'Delete roles', resource: 'roles', action: 'delete' },
-        { name: 'roles.manage', description: 'Manage all roles', resource: 'roles', action: 'manage' },
-        { name: 'billing.read', description: 'View billing information', resource: 'billing', action: 'read' },
-        { name: 'billing.update', description: 'Update billing settings', resource: 'billing', action: 'update' },
-        { name: 'system.read', description: 'View system logs', resource: 'system', action: 'read' },
-        { name: 'system.manage', description: 'Manage system settings', resource: 'system', action: 'manage' },
+        { name: 'users:create', description: 'Create users', resource: 'users', action: 'create' },
+        { name: 'users:read', description: 'Read users', resource: 'users', action: 'read' },
+        { name: 'users:update', description: 'Update users', resource: 'users', action: 'update' },
+        { name: 'users:delete', description: 'Delete users', resource: 'users', action: 'delete' },
+        { name: 'users:manage', description: 'Manage all users', resource: 'users', action: 'manage' },
+        { name: 'employees:create', description: 'Create employees', resource: 'employees', action: 'create' },
+        { name: 'employees:read', description: 'Read employees', resource: 'employees', action: 'read' },
+        { name: 'employees:update', description: 'Update employees', resource: 'employees', action: 'update' },
+        { name: 'employees:delete', description: 'Delete employees', resource: 'employees', action: 'delete' },
+        { name: 'roles:create', description: 'Create roles', resource: 'roles', action: 'create' },
+        { name: 'roles:read', description: 'Read roles', resource: 'roles', action: 'read' },
+        { name: 'roles:update', description: 'Update roles', resource: 'roles', action: 'update' },
+        { name: 'roles:delete', description: 'Delete roles', resource: 'roles', action: 'delete' },
+        { name: 'roles:manage', description: 'Manage all roles', resource: 'roles', action: 'manage' },
+        { name: 'billing:read', description: 'View billing information', resource: 'billing', action: 'read' },
+        { name: 'billing:update', description: 'Update billing settings', resource: 'billing', action: 'update' },
+        { name: 'system:read', description: 'View system logs', resource: 'system', action: 'read' },
+        { name: 'system:manage', description: 'Manage system settings', resource: 'system', action: 'manage' },
+        { name: 'audit-logs:read', description: 'View audit logs', resource: 'audit-logs', action: 'read' },
+        { name: 'dashboard:view', description: 'View dashboard', resource: 'dashboard', action: 'view' },
+        { name: 'users:restore', description: 'Restore users', resource: 'users', action: 'restore' },
+        { name: 'users:view-sessions', description: 'View user sessions', resource: 'users', action: 'view-sessions' },
+        { name: 'users:terminate-sessions', description: 'Terminate user sessions', resource: 'users', action: 'terminate-sessions' },
       ];
 
       permissions = await permissionRepository.createMany(seedPermissions);
+    }
+
+    // 2. Ensure Default Roles Exist and have Permissions (Hybrid Model Seeding)
+    const rolesToSeed = ['admin', 'employee', 'user'];
+    
+    for (const roleName of rolesToSeed) {
+        const existingRole = await roleRepository.findByName(roleName);
+        
+        // If role exists but has NO permissions (and is not 'user'), seed them
+        // If role doesn't exist, create it with permissions
+        
+        if (!existingRole) {
+            // Create Role
+            const defaultPerms = DEFAULT_ROLE_PERMISSIONS[roleName] || [];
+            // Map string permissions to IDs
+            const permIds = permissions
+                .filter(p => defaultPerms.includes(p.name))
+                .map(p => p._id);
+
+            await roleRepository.create({
+                name: roleName,
+                description: `Default ${roleName} role`,
+                permissions: permIds
+            });
+            console.log(`Seeded role: ${roleName}`);
+        } else if (existingRole.permissions.length === 0 && roleName !== 'user') {
+            // Role exists but empty permissions (migrating from hardcoded?) -> Seed them
+             const defaultPerms = DEFAULT_ROLE_PERMISSIONS[roleName] || [];
+             const permIds = permissions
+                .filter(p => defaultPerms.includes(p.name))
+                .map(p => p._id);
+             
+             if (permIds.length > 0) {
+                 await roleRepository.updateById(existingRole._id, { permissions: permIds });
+                 console.log(`Seeded permissions for existing role: ${roleName}`);
+             }
+        }
     }
 
     // Sort permissions
@@ -105,10 +148,10 @@ class RoleService {
       throw error;
     }
 
-    // Business rule: Prevent updating system roles
-    const systemRoles = ['admin', 'user', 'super admin', 'employee'];
-    if (systemRoles.includes(role.name.toLowerCase())) {
-      const error = new Error(`Cannot update permissions for system role "${role.name}"`);
+    // Business rule: Prevent updating Super Admin (God Mode)
+    // All other roles (Admin, Employee, User) are editable
+    if (role.name.toLowerCase() === 'super admin') {
+      const error = new Error(`Cannot update permissions for Super Admin (God Mode)`);
       error.statusCode = 400;
       throw error;
     }
@@ -225,8 +268,8 @@ class RoleService {
     }
 
     // Business rule: Prevent updating system roles
-    const systemRoles = ['admin', 'user'];
-    if (systemRoles.includes(role.name.toLowerCase())) {
+    // Hybrid Model: Only Super Admin is immutable
+    if (role.name.toLowerCase() === 'super admin') {
       const error = new Error(`Cannot update system role "${role.name}"`);
       error.statusCode = 400;
       throw error;
@@ -297,8 +340,8 @@ class RoleService {
     }
 
     // Business rule: Prevent deleting system roles
-    const systemRoles = ['admin', 'user', 'super admin'];
-    if (systemRoles.includes(role.name.toLowerCase())) {
+    // Hybrid Model: Only Super Admin is immutable
+    if (role.name.toLowerCase() === 'super admin') {
       const error = new Error(`Cannot delete system role "${role.name}"`);
       error.statusCode = 400;
       throw error;

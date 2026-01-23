@@ -6,12 +6,12 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "jest --testPathPattern=__tests__ --setupFilesAfterEnv=./src/test/jest.setup.js",
-    "test:watch": "jest --watch --testPathPattern=__tests__",
-    "test:coverage": "jest --coverage --testPathPattern=__tests__",
-    "test:services": "jest --testPathPattern=services/__tests__",
-    "test:repositories": "jest --testPathPattern=repositories/__tests__",
-    "test:permissions": "jest --testPathPattern=permissions/__tests__",
+    "test": "jest --testPathPatterns=__tests__ --setupFilesAfterEnv=./src/test/jest.setup.js",
+    "test:watch": "jest --watch --testPathPatterns=__tests__",
+    "test:coverage": "jest --coverage --testPathPatterns=__tests__",
+    "test:services": "jest --testPathPatterns=services/__tests__",
+    "test:repositories": "jest --testPathPatterns=repositories/__tests__",
+    "test:permissions": "jest --testPathPatterns=permissions/__tests__",
     "migrate:roles": "node src/utils/migrateRoles.js"
   },
   "keywords": [],

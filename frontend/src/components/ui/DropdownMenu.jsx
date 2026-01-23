@@ -119,7 +119,7 @@ const DropdownMenuItem = ({ children, onClick, variant = 'default', disabled, cl
         }
       }}
       disabled={disabled}
-      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 ${variantClasses[variant]} ${className}`}
+      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 ${variantClasses[variant]} ${className}`}
     >
       {children}
     </button>

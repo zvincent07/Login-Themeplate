@@ -8,8 +8,13 @@
  * - Permissions are the contract
  */
 
-const ROLES = {
+// Default permissions for seeding - acts as a reference, not hardcoded enforcement (except God Mode)
+const DEFAULT_ROLE_PERMISSIONS = {
   'super admin': [
+    // God Mode - effectively has all permissions
+    '*',
+  ],
+  admin: [
     'users:create',
     'users:read',
     'users:update',
@@ -27,29 +32,10 @@ const ROLES = {
     'roles:update',
     'roles:delete',
     'roles:manage',
+    'audit-logs:read',
+    'dashboard:view',
     'billing:read',
     'billing:update',
-    'system:read',
-    'system:manage',
-    'audit-logs:read',
-    'dashboard:view',
-  ],
-  admin: [
-    'users:create',
-    'users:read',
-    'users:update',
-    'users:delete',
-    'users:manage',
-    'users:restore',
-    'users:view-sessions',
-    'users:terminate-sessions',
-    'employees:create',
-    'employees:read',
-    'employees:update',
-    'employees:delete',
-    'roles:read',
-    'audit-logs:read',
-    'dashboard:view',
   ],
   employee: [
     'employees:read',
@@ -60,23 +46,43 @@ const ROLES = {
 };
 
 /**
- * Get permissions for a role
+ * Get default permissions for a role (for seeding)
  */
-const getPermissionsForRole = (roleName) => {
+const getDefaultPermissionsForRole = (roleName) => {
   const normalizedRole = (roleName || '').toLowerCase().trim();
-  return ROLES[normalizedRole] || [];
+  return DEFAULT_ROLE_PERMISSIONS[normalizedRole] || [];
 };
 
 /**
  * Check if user has a specific permission
+ * Implements Hybrid Model:
+ * 1. Super Admin: God Mode (always true)
+ * 2. Others: DB-driven permissions
  */
 const hasPermission = (user, permission) => {
-  if (!user || !permission) return false;
+  if (!user) return false;
   
-  const userRole = (user.roleName || '').toLowerCase().trim();
-  const userPermissions = getPermissionsForRole(userRole);
+  // 1. God Mode for Super Admin
+  const roleName = (user.role?.name || user.roleName || '').toLowerCase().trim();
+  if (roleName === 'super admin') {
+    return true;
+  }
   
-  return userPermissions.includes(permission);
+  // 2. DB-Driven Check
+  // Assuming user.role.permissions is populated as an array of Permission objects (with name property)
+  // or strings if it's a flat array.
+  
+  if (user.role && Array.isArray(user.role.permissions)) {
+    // Check if permissions are objects or strings
+    const userPermissions = user.role.permissions.map(p => 
+      typeof p === 'object' ? p.name : p
+    );
+    return userPermissions.includes(permission);
+  }
+
+  // Fallback for legacy/incomplete objects (e.g. during login before populate)
+  // This shouldn't happen often if auth middleware is correct
+  return false;
 };
 
 /**
@@ -95,7 +101,7 @@ const requirePermission = (user, permission, resourceName = 'resource') => {
  * Check if user can access resource (ownership check)
  */
 const canAccessResource = (user, resourceUserId, permission) => {
-  // If user has the permission, they can access
+  // If user has the permission (includes Super Admin God Mode), they can access
   if (hasPermission(user, permission)) {
     return true;
   }
@@ -109,8 +115,8 @@ const canAccessResource = (user, resourceUserId, permission) => {
 };
 
 module.exports = {
-  ROLES,
-  getPermissionsForRole,
+  DEFAULT_ROLE_PERMISSIONS, // Exported for seeding
+  getDefaultPermissionsForRole,
   hasPermission,
   requirePermission,
   canAccessResource,

@@ -28,6 +28,8 @@ jest.mock('../../utils/auditLogger');
 describe('AuthService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    const { parseUserAgent } = require('../../utils/ipGeolocation');
+    parseUserAgent.mockReturnValue({ platform: 'test', browser: 'test', version: '1.0', os: 'test' });
   });
 
   describe('register', () => {
@@ -38,6 +40,9 @@ describe('AuthService', () => {
       roleRepository.findByName.mockResolvedValue(mockRole);
       userRepository.findByEmail.mockResolvedValue(null);
       userRepository.create.mockResolvedValue(mockUser);
+
+      const validatePasswordStrength = require('../../utils/passwordValidator');
+      validatePasswordStrength.mockReturnValue({ isValid: true });
 
       const { sendOTPEmail } = require('../../services/emailService');
       sendOTPEmail.mockResolvedValue({ success: true });
@@ -73,7 +78,6 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should login user with valid credentials', async () => {
-      const User = require('../../models/User');
       const mockUserModel = {
         _id: 'user123',
         email: 'test@example.com',
@@ -85,10 +89,7 @@ describe('AuthService', () => {
         toObject: () => ({ _id: 'user123', email: 'test@example.com' }),
       };
 
-      User.findOne.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        populate: jest.fn().mockResolvedValue(mockUserModel),
-      });
+      userRepository.findByEmailWithPassword.mockResolvedValue(mockUserModel);
 
       bannedIPRepository.isBanned.mockResolvedValue(false);
       loginAttemptRepository.resetAttempts.mockResolvedValue({ deletedCount: 1 });
@@ -110,8 +111,7 @@ describe('AuthService', () => {
     });
 
     it('should ban IP after too many failed attempts', async () => {
-      const User = require('../../models/User');
-      User.findOne.mockResolvedValue(null);
+      userRepository.findByEmailWithPassword.mockResolvedValue(null);
 
       bannedIPRepository.isBanned.mockResolvedValue(false);
       loginAttemptRepository.recordFailedAttempt.mockResolvedValue({

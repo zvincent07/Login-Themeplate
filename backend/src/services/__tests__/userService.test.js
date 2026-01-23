@@ -10,13 +10,14 @@
 const userService = require('../userService');
 const userRepository = require('../../repositories/userRepository');
 const roleRepository = require('../../repositories/roleRepository');
-const { requirePermission } = require('../../permissions');
+const { requirePermission, canAccessResource } = require('../../permissions');
 
-// Mock repositories
-jest.mock('../../repositories/userRepository');
-jest.mock('../../repositories/roleRepository');
-jest.mock('../../repositories/sessionRepository');
-jest.mock('../../permissions');
+// Mock permissions module with factory to support both functions
+jest.mock('../../permissions', () => ({
+  requirePermission: jest.fn(),
+  canAccessResource: jest.fn(),
+  getPermissionsForRole: jest.fn().mockReturnValue([]),
+}));
 jest.mock('../../utils/auditLogger', () => ({
   createAuditLog: jest.fn(),
   createAuditLogWithChanges: jest.fn(),
@@ -92,6 +93,7 @@ describe('UserService', () => {
       const mockActor = { id: 'user123', roleName: 'user' };
       const mockUser = { _id: 'user123', email: 'test@example.com' };
 
+      canAccessResource.mockReturnValue(true);
       userRepository.findById.mockResolvedValue(mockUser);
 
       const result = await userService.getUserById('user123', mockActor);
@@ -113,6 +115,7 @@ describe('UserService', () => {
       const mockActor = { id: 'admin123', roleName: 'admin' };
       const mockUser = { _id: 'admin123', email: 'admin@example.com' };
 
+      canAccessResource.mockReturnValue(true);
       userRepository.findById.mockResolvedValue(mockUser);
 
       await expect(

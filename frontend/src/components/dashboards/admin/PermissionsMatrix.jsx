@@ -233,11 +233,11 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
         />
       )}
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Permissions Matrix
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -263,7 +263,7 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
             ) : resources.length === 0 ? (
               <div className="text-center py-12">
                 <div className="max-w-md mx-auto">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
                     <svg
                       className="w-8 h-8 text-gray-400 dark:text-gray-500"
                       fill="none"
@@ -278,7 +278,7 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     No Permissions Available
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
@@ -299,26 +299,26 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                  <thead className="bg-gray-50 dark:bg-slate-700 sticky top-0 z-10">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-slate-700 z-20">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-200 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-700 z-20">
                         Resource
                       </th>
                       {actions.map(action => (
                         <th
                           key={action}
-                          className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[100px]"
+                          className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-200 uppercase tracking-wider min-w-[100px]"
                         >
                           {action.charAt(0).toUpperCase() + action.slice(1)}
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-200 uppercase tracking-wider min-w-[120px]">
                         All
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {resources.map((resource) => {
                       const isFullySelected = isResourceFullySelected(resource);
                       const isPartiallySelected = isResourcePartiallySelected(resource);
@@ -328,11 +328,11 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
                           key={resource}
                           className={`transition-colors ${
                             isSystemRole
-                              ? 'hover:bg-gray-50 dark:hover:bg-slate-700/30'
-                              : 'hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer'
+                              ? 'hover:bg-gray-50 dark:hover:bg-gray-700/30'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer'
                           }`}
                         >
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-slate-100 sticky left-0 bg-white dark:bg-slate-800 z-10 capitalize">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-800 z-10 capitalize">
                             {resource}
                           </td>
                           {actions.map(action => {
@@ -417,7 +417,7 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {isSystemRole ? (
                 <span className="text-blue-600 dark:text-blue-400">
@@ -434,7 +434,7 @@ const PermissionsMatrix = ({ role, isOpen, onClose, isSystemRole = false }) => {
                 type="button"
                 onClick={onClose}
                 disabled={saving}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               >
                 {isSystemRole ? 'Close' : hasChanges ? 'Cancel' : 'Close'}
               </button>

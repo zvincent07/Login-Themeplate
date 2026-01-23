@@ -8,7 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <BrowserRouter future={{ v7_startTransition: true }}>
+      <BrowserRouter>
         <App />
       </BrowserRouter>
     </ErrorBoundary>
