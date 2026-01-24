@@ -60,7 +60,7 @@ const UserFilters = ({
   }, []);
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
       <div className="flex-1 flex flex-col sm:flex-row flex-wrap gap-3">
         {/* Search */}
         <div className="flex-[2] min-w-[200px]">
@@ -72,7 +72,7 @@ const UserFilters = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by email..."
-            className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
           />
         </div>
 
@@ -85,7 +85,7 @@ const UserFilters = ({
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
             disabled={loadingRoles}
-            className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-32 h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <option value="all">All Roles</option>
             {loadingRoles ? (
@@ -108,7 +108,7 @@ const UserFilters = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full sm:w-32 h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -126,7 +126,7 @@ const UserFilters = ({
           <select
             value={providerFilter}
             onChange={(e) => setProviderFilter(e.target.value)}
-            className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full sm:w-32 h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
           >
             <option value="all">All Providers</option>
             <option value="local">Local</option>
@@ -143,7 +143,7 @@ const UserFilters = ({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full sm:w-32 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="w-full sm:w-32 h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
             >
               <option value="createdAt">Created At</option>
               <option value="email">Email</option>
@@ -153,15 +153,15 @@ const UserFilters = ({
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-2.5 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
+              className="px-3 py-2 h-[38px] text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
             >
               {sortOrder === 'asc' ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               )}
@@ -175,11 +175,11 @@ const UserFilters = ({
         <button
           type="button"
           onClick={handleReset}
-          className="self-start sm:self-auto h-9 w-9 flex items-center justify-center text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors shadow-sm hover:shadow"
+          className="self-start sm:self-auto h-[38px] w-[38px] flex items-center justify-center text-gray-700 dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm hover:shadow"
           title="Reset all filters"
           aria-label="Reset filters"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>

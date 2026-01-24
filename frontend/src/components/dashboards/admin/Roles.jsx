@@ -443,7 +443,7 @@ const Roles = () => {
     {
       key: 'actions',
       label: 'Actions',
-      align: 'center',
+      align: 'left',
       render: (role) => {
         const roleId = role._id || role.id;
         const isSystem = isSystemRole(role.name);
@@ -451,7 +451,7 @@ const Roles = () => {
           <DropdownMenu
             isOpen={openDropdown === roleId}
             onClose={() => setOpenDropdown(null)}
-            className="flex justify-center"
+            className="flex justify-start items-center"
             trigger={
               <button
                 onClick={(e) => {
@@ -603,8 +603,7 @@ const Roles = () => {
             user={authService.getStoredUser()}
             permission="roles:create"
             onClick={handleCreate}
-            size="sm"
-            className="flex items-center gap-1.5"
+            className="h-[38px] px-4 text-sm flex items-center gap-1.5"
           >
             <svg
               className="w-4 h-4"

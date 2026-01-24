@@ -907,225 +907,159 @@ const Users = () => {
     {
       label: 'Actions',
       key: 'actions',
-      align: 'center',
+      align: 'left',
       render: (user) => {
         const userId = user._id || user.id;
         const isCurrentUser = currentUserId && (userId === currentUserId || userId.toString() === currentUserId.toString());
         
         return (
-          <div className="relative dropdown-container flex justify-center">
-            <button
-              data-user-id={userId}
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent row click
-                if (openDropdown === userId) {
-                  setOpenDropdown(null);
-                } else {
-                  // Calculate if dropdown should open upward
-                  const buttonRect = e.currentTarget.getBoundingClientRect();
-                  const spaceBelow = window.innerHeight - buttonRect.bottom;
-                  const spaceAbove = buttonRect.top;
-                  const dropdownHeight = 180; // Approximate height of dropdown
-                  
-                  // Open upward if not enough space below but enough space above
-                  const openUpward = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight;
-                  setDropdownPosition({ [userId]: openUpward ? 'top' : 'bottom' });
-                  setOpenDropdown(userId);
-                }
-              }}
-              className="p-1.5 text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-              title="Actions"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
-                />
-              </svg>
-            </button>
-            
-            {/* Dropdown Menu - Using fixed positioning to avoid scrollbar */}
-            {openDropdown === userId && (
-              <div 
-                className={`fixed w-40 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-gray-200 dark:border-slate-700 z-[100] py-1 ${
-                  dropdownPosition[userId] === 'top' 
-                    ? 'animate-[fadeIn_0.2s_ease-out_forwards,slideUp_0.2s_ease-out_forwards]' 
-                    : 'animate-[fadeIn_0.2s_ease-out_forwards,slideDown_0.2s_ease-out_forwards]'
-                }`}
-                style={{
-                  left: `${(() => {
-                    const button = document.querySelector(`[data-user-id="${userId}"]`);
-                    // Align right edge of dropdown with right edge of button
-                    return button ? button.getBoundingClientRect().right - 160 : 0; 
-                  })()}px`,
-                  [dropdownPosition[userId] === 'top' ? 'bottom' : 'top']: `${(() => {
-                    const button = document.querySelector(`[data-user-id="${userId}"]`);
-                    if (button) {
-                      const rect = button.getBoundingClientRect();
-                      return dropdownPosition[userId] === 'top' 
-                        ? `${window.innerHeight - rect.top + 4}px`
-                        : `${rect.bottom + 4}px`;
-                    }
-                    return '0px';
-                  })()}`
+          <DropdownMenu
+            isOpen={openDropdown === userId}
+            onClose={() => setOpenDropdown(null)}
+            className="flex justify-start items-center"
+            trigger={
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent row click
+                  e.preventDefault();
+                  if (openDropdown === userId) {
+                    setOpenDropdown(null);
+                  } else {
+                    setOpenDropdown(userId);
+                  }
                 }}
-                onClick={(e) => e.stopPropagation()}
+                className="p-1.5 text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                title="Actions"
               >
-                {/* Show Restore for deleted users, otherwise show normal actions */}
-                {user.deletedAt ? (
-                  <>
-                    {/* View */}
-                    <button
-                      onClick={() => handleView(user)}
-                      className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
+                  />
+                </svg>
+              </button>
+            }
+          >
+            {/* Show Restore for deleted users, otherwise show normal actions */}
+            {user.deletedAt ? (
+              <>
+                <DropdownMenu.Item
+                  onClick={() => handleView(user)}
+                >
+                  <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>View</span>
+                </DropdownMenu.Item>
+                
+                <DropdownMenu.Item
+                  onClick={() => handleRestore(user)}
+                  disabled={management.submitting}
+                  className="text-green-600 dark:text-green-400"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Restore</span>
+                </DropdownMenu.Item>
+              </>
+            ) : (
+              <>
+                <DropdownMenu.Item
+                  onClick={() => handleView(user)}
+                >
+                  <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>View</span>
+                </DropdownMenu.Item>
+                
+                <DropdownMenu.Item
+                  onClick={(e) => {
+                    if (management.isOwnAccount(userId)) {
+                      setToast({
+                        message: 'You cannot edit your own account.',
+                        type: 'error',
+                      });
+                      return;
+                    }
+                    handleEdit(user);
+                    setOpenDropdown(null);
+                  }}
+                  disabled={isCurrentUser}
+                  className={isCurrentUser ? 'opacity-50' : ''}
+                >
+                  <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-slate-500' : 'text-gray-600 dark:text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span className={isCurrentUser ? 'line-through' : ''}>Edit</span>
+                </DropdownMenu.Item>
+                
+                <DropdownMenu.Item
+                  onClick={(e) => {
+                    if (management.isOwnAccount(userId)) {
+                      setToast({
+                        message: 'You cannot deactivate your own account.',
+                        type: 'error',
+                      });
+                      return;
+                    }
+                    if (management.submitting) return;
+                    handleToggleActive(user);
+                    setOpenDropdown(null);
+                  }}
+                  disabled={isCurrentUser || management.submitting}
+                  className={isCurrentUser ? 'opacity-50' : ''}
+                >
+                  {user.isActive ? (
+                    <>
+                      <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-gray-400' : 'text-amber-600 dark:text-amber-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                       </svg>
-                      <span>View</span>
-                    </button>
-                    
-                    {/* Restore */}
-                    <button
-                      onClick={() => handleRestore(user)}
-                      disabled={management.submitting}
-                      className="w-full px-4 py-2.5 text-sm text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <span className={isCurrentUser ? 'line-through' : ''}>Deactivate</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-slate-500' : 'text-green-600 dark:text-green-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>Restore</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* View */}
-                    <button
-                      onClick={() => handleView(user)}
-                      className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      <span>View</span>
-                    </button>
-                    
-                    {/* Edit */}
-                    <button
-                      type="button"
-                      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
-                        isCurrentUser
-                          ? 'text-gray-400 dark:text-gray-400 opacity-50'
-                          : 'text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
-                      }`}
-                      title={isCurrentUser ? "You cannot edit your own account" : "Edit user"}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        if (management.isOwnAccount(userId)) {
-                          setToast({
-                            message: 'You cannot edit your own account.',
-                            type: 'error',
-                          });
-                          return;
-                        }
-                        handleEdit(user);
-                        setOpenDropdown(null);
-                      }}
-                    >
-                      <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-slate-500' : 'text-gray-600 dark:text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      <span className={isCurrentUser ? 'line-through' : ''}>Edit</span>
-                    </button>
-                    
-                    {/* Deactivate/Activate */}
-                    <button
-                      type="button"
-                      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
-                        isCurrentUser
-                          ? 'text-gray-400 dark:text-slate-500 opacity-50 cursor-pointer'
-                          : user.isActive
-                          ? 'text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
-                          : 'text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
-                      } ${management.submitting && !isCurrentUser ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title={isCurrentUser ? "You cannot deactivate your own account" : user.isActive ? "Deactivate user" : "Activate user"}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        if (management.isOwnAccount(userId)) {
-                          setToast({
-                            message: 'You cannot deactivate your own account.',
-                            type: 'error',
-                          });
-                          return;
-                        }
-                        
-                        if (management.submitting) return;
-                        handleToggleActive(user);
-                        setOpenDropdown(null);
-                      }}
-                    >
-                      {user.isActive ? (
-                        <>
-                          <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-gray-400' : 'text-amber-600 dark:text-amber-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                          </svg>
-                          <span className={isCurrentUser ? 'line-through' : ''}>Deactivate</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-slate-500' : 'text-green-600 dark:text-green-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span className={isCurrentUser ? 'line-through' : ''}>Activate</span>
-                        </>
-                      )}
-                    </button>
-                    
-                    {/* Delete */}
-                    <button
-                      className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-2 ${
-                        isCurrentUser
-                          ? 'text-gray-400 dark:text-slate-500 cursor-not-allowed opacity-50'
-                          : 'text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer'
-                      }`}
-                      title={isCurrentUser ? "You cannot delete your own account" : "Delete user"}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        if (management.isOwnAccount(userId)) {
-                          setToast({
-                            message: 'You cannot delete your own account.',
-                            type: 'error',
-                          });
-                          return;
-                        }
-                        handleDelete(user);
-                      }}
-                    >
-                      <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-slate-500' : 'text-red-600 dark:text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      <span className={isCurrentUser ? 'line-through text-gray-400 dark:text-slate-500' : 'text-red-600 dark:text-red-400'}>Delete</span>
-                    </button>
-                  </>
-                )}
-              </div>
+                      <span className={isCurrentUser ? 'line-through' : ''}>Activate</span>
+                    </>
+                  )}
+                </DropdownMenu.Item>
+                
+                <DropdownMenu.Item
+                  onClick={(e) => {
+                    if (management.isOwnAccount(userId)) {
+                      setToast({
+                        message: 'You cannot delete your own account.',
+                        type: 'error',
+                      });
+                      return;
+                    }
+                    handleDelete(user);
+                    setOpenDropdown(null);
+                  }}
+                  disabled={isCurrentUser}
+                  className={isCurrentUser ? 'opacity-50' : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'}
+                >
+                  <svg className={`w-4 h-4 ${isCurrentUser ? 'text-gray-400 dark:text-slate-500' : 'text-red-600 dark:text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span className={isCurrentUser ? 'line-through text-gray-400 dark:text-slate-500' : ''}>Delete</span>
+                </DropdownMenu.Item>
+              </>
             )}
-          </div>
+          </DropdownMenu>
         );
       }
     }
@@ -1162,7 +1096,7 @@ const Users = () => {
               });
             }}
             title="Export to CSV"
-            className="w-auto flex items-center gap-1.5"
+            className="w-auto h-[38px] px-4 text-sm flex items-center gap-1.5"
           >
             <svg
               className="w-4 h-4"
@@ -1184,8 +1118,7 @@ const Users = () => {
             user={authService.getStoredUser()}
             permission="users:create"
             onClick={handleCreate}
-            size="sm"
-            className="w-auto flex items-center gap-1.5"
+            className="w-auto h-[38px] px-4 text-sm flex items-center gap-1.5"
           >
             <svg
               className="w-4 h-4"
@@ -1224,14 +1157,13 @@ const Users = () => {
                 Clear selection
               </button>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-nowrap">
               <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBulkExport}
-                disabled={management.submitting}
-                className="flex items-center gap-1.5 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-              >
+                  variant="outline"
+                  onClick={handleBulkExport}
+                  disabled={management.submitting}
+                  className="h-[38px] px-4 text-sm flex items-center gap-1.5 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -1244,8 +1176,7 @@ const Users = () => {
                 onClick={handleBulkDelete}
                 disabled={management.submitting}
                 variant="danger"
-                size="sm"
-                className="flex items-center gap-1.5"
+                className="h-[38px] px-4 text-sm flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

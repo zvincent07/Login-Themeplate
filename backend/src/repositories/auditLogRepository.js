@@ -50,6 +50,19 @@ class AuditLogRepository {
       query.resourceId = filters.resourceId;
     }
 
+    if (filters.search) {
+      const searchRegex = { $regex: filters.search, $options: 'i' };
+      query.$or = [
+        { actorEmail: searchRegex },
+        { actorName: searchRegex },
+        { action: searchRegex },
+        { resourceType: searchRegex },
+        { resourceId: searchRegex },
+        { resourceName: searchRegex },
+        { ip: searchRegex },
+      ];
+    }
+
     if (filters.startDate || filters.endDate) {
       query.createdAt = {};
       if (filters.startDate) {

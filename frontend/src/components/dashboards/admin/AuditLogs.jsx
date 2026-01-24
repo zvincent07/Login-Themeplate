@@ -109,7 +109,7 @@ const parseUserAgent = (userAgent) => {
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   
@@ -130,6 +130,8 @@ const AuditLogs = () => {
   const [search, setSearch] = useState('');
   const [resourceType, setResourceType] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Derive a small set of common actions from the loaded logs so the filter feels smart
   const actionOptions = useMemo(() => {
@@ -166,8 +168,10 @@ const AuditLogs = () => {
         page: nextPage,
         limit: PAGE_SIZE,
         search: options.search ?? (search.trim() || undefined),
-        resourceType: options.resourceType ?? resourceType,
-        action: options.action ?? actionFilter,
+        resourceType: (options.resourceType ?? resourceType) === 'all' ? undefined : (options.resourceType ?? resourceType),
+        action: (options.action ?? actionFilter) === 'all' ? undefined : (options.action ?? actionFilter),
+        from: options.from ?? (startDate || undefined),
+        to: options.to ?? (endDate || undefined),
       }, abortController.signal);
 
       // Check if request was aborted
@@ -227,6 +231,20 @@ const AuditLogs = () => {
     setActionFilter(value);
     setPage(1);
     fetchLogs({ page: 1, action: value });
+  };
+
+  const handleStartDateChange = (e) => {
+    const value = e.target.value;
+    setStartDate(value);
+    setPage(1);
+    fetchLogs({ page: 1, from: value });
+  };
+
+  const handleEndDateChange = (e) => {
+    const value = e.target.value;
+    setEndDate(value);
+    setPage(1);
+    fetchLogs({ page: 1, to: value });
   };
 
   const handleSearchSubmit = (e) => {
@@ -431,21 +449,30 @@ const AuditLogs = () => {
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 p-4 flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
-        <form onSubmit={handleSearchSubmit} className="flex-1 flex flex-col sm:flex-row gap-3">
-          <FormField label="Search" className="flex-1">
-            <Input
+        <form onSubmit={handleSearchSubmit} className="flex-1 flex flex-col sm:flex-row flex-wrap gap-3">
+          {/* Search */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Search
+            </label>
+            <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search actor, target, or action…"
+              placeholder="Search actor, target, or action..."
+              className="w-full h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
             />
-          </FormField>
+          </div>
 
-          <FormField label="Resource" className="w-full sm:w-40">
+          {/* Resource */}
+          <div className="w-full sm:w-40">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Resource
+            </label>
             <select
               value={resourceType}
               onChange={handleResourceTypeChange}
-              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="w-full h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
             >
               {resourceTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -453,13 +480,17 @@ const AuditLogs = () => {
                 </option>
               ))}
             </select>
-          </FormField>
+          </div>
 
-          <FormField label="Action" className="w-full sm:w-40">
+          {/* Action */}
+          <div className="w-full sm:w-40">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Action
+            </label>
             <select
               value={actionFilter}
               onChange={handleActionFilterChange}
-              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="w-full h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
             >
               <option value="all">All actions</option>
               {actionOptions
@@ -470,29 +501,55 @@ const AuditLogs = () => {
                   </option>
                 ))}
             </select>
-          </FormField>
+          </div>
+
+          {/* From */}
+          <div className="w-full sm:w-36">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              From
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={handleStartDateChange}
+              className="w-full h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+            />
+          </div>
+
+          {/* To */}
+          <div className="w-full sm:w-36">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              To
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={handleEndDateChange}
+              className="w-full h-[38px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+            />
+          </div>
         </form>
 
         {/* Only show Reset button when filters are applied */}
-        {(search.trim() !== '' || resourceType !== 'all' || actionFilter !== 'all') && (
-          <Button
+        {(search.trim() !== '' || resourceType !== 'all' || actionFilter !== 'all' || startDate !== '' || endDate !== '') && (
+          <button
             type="button"
-            variant="outline"
-            size="sm"
             onClick={() => {
               setSearch('');
               setResourceType('all');
               setActionFilter('all');
-              fetchLogs({ page: 1, search: '', resourceType: 'all', action: 'all' });
+              setStartDate('');
+              setEndDate('');
+              fetchLogs({ page: 1, search: '', resourceType: 'all', action: 'all', from: '', to: '' });
             }}
-            className="self-start sm:self-auto h-9 w-9 p-0"
+            className="self-start sm:self-auto h-[38px] w-[38px] flex items-center justify-center text-gray-700 dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm hover:shadow"
             title="Reset all filters"
             aria-label="Reset filters"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-          </Button>
+          </button>
         )}
       </div>
 
@@ -502,7 +559,7 @@ const AuditLogs = () => {
           columns={columns}
           data={logs}
           loading={loading}
-          emptyMessage={error || "No audit entries found for the current filters."}
+          emptyMessage={error}
           onRowClick={handleRowClick}
           className="flex-1"
         />
@@ -663,7 +720,6 @@ const AuditLogs = () => {
                   </h3>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={handleCopyJSON}
                     className="w-auto flex items-center gap-1.5"
                     title="Copy JSON to clipboard"

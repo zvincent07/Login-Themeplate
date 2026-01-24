@@ -213,8 +213,54 @@ const Permissions = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      <div className="max-h-[calc(100vh-7rem)] flex flex-col relative">
+        <div className="mb-6">
+          <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+
+        <div className="flex flex-col md:flex-row flex-1 gap-6 overflow-hidden pb-0">
+          {/* Sidebar Skeleton */}
+          <div className="w-full md:w-64 flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col max-h-60 md:max-h-full">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            <div className="overflow-y-auto flex-1 p-2 space-y-1 pb-20">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-9 w-full bg-gray-100 dark:bg-gray-700/50 rounded animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Content Skeleton */}
+          <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="h-7 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+              <div className="h-4 w-96 bg-gray-100 dark:bg-gray-700/50 rounded animate-pulse"></div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 pb-20">
+              <div className="space-y-8">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                      <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[1, 2, 3, 4].map((j) => (
+                        <div key={j} className="flex items-start gap-3 p-2">
+                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-1"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            <div className="h-3 w-32 bg-gray-100 dark:bg-gray-700/50 rounded animate-pulse"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -236,9 +282,9 @@ const Permissions = () => {
         {/* Helper text removed as requested */}
       </div>
 
-      <div className="flex flex-1 gap-6 overflow-hidden pb-0">
+      <div className="flex flex-col md:flex-row flex-1 gap-6 overflow-hidden pb-0">
         {/* Sidebar - Roles List */}
-        <div className="w-64 flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col">
+        <div className="w-full md:w-64 flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col max-h-60 md:max-h-full">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="font-semibold text-gray-900 dark:text-white">Roles</h2>
           </div>
@@ -257,8 +303,8 @@ const Permissions = () => {
                 }}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                   (selectedRole?._id === role._id || selectedRole?.id === role.id)
-                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-white font-medium'
+                    : 'text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {role.name}
@@ -292,9 +338,26 @@ const Permissions = () => {
               
               <div className="flex-1 overflow-y-auto p-6 pb-20">
                 {loadingRole ? (
-                   <div className="flex justify-center py-10">
-                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                   </div>
+                  <div className="space-y-8">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {[1, 2, 3, 4].map((j) => (
+                            <div key={j} className="flex items-start gap-3 p-2">
+                              <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-1"></div>
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                                <div className="h-3 w-32 bg-gray-100 dark:bg-gray-700/50 rounded animate-pulse"></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="space-y-8">
                     {resources.map(resource => {
@@ -312,7 +375,7 @@ const Permissions = () => {
                               {!isSystemRole && (
                                 <button
                                   onClick={() => handleToggleResource(resource, !allEnabled)}
-                                  className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                                  className="text-xs font-medium text-primary-600 dark:text-blue-300 hover:text-primary-700 dark:hover:text-blue-200"
                                 >
                                   {allEnabled ? 'Uncheck All' : 'Check All'}
                                 </button>
@@ -374,16 +437,20 @@ const Permissions = () => {
            </span>
            <div className="flex items-center gap-2">
              <Button 
-               variant="ghost" 
-               size="sm" 
+               variant="outline" 
                onClick={handleCancelChanges} 
                disabled={saving}
-               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:underline"
+               className="h-[38px] px-4 text-sm"
              >
                Cancel
              </Button>
-             <Button variant="primary" size="sm" onClick={handleSaveChanges} isLoading={saving}>
-               Save Changes
+             <Button 
+               variant="primary" 
+               onClick={handleSaveChanges} 
+               isLoading={saving}
+               className="h-[38px] px-4 text-sm"
+             >
+               Save
              </Button>
            </div>
         </div>

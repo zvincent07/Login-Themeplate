@@ -17,14 +17,22 @@ class AuditLogService {
   async getAuditLogs(filters, options, actor) {
     requirePermission(actor, 'audit-logs:read', 'audit logs');
 
+    // Handle end date to include the full day
+    let endDate;
+    if (filters.to) {
+      endDate = new Date(filters.to);
+      endDate.setUTCHours(23, 59, 59, 999);
+    }
+
     // Whitelist allowed filters
     const allowedFilters = {
       resourceType: filters.resourceType,
       actorEmail: filters.actorEmail,
       action: filters.action,
       resourceId: filters.resourceId,
+      search: filters.search,
       startDate: filters.from ? new Date(filters.from) : undefined,
-      endDate: filters.to ? new Date(filters.to) : undefined,
+      endDate: endDate,
     };
 
     // Remove undefined values

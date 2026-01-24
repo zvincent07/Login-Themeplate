@@ -38,8 +38,49 @@ const Table = ({
 
   if (loading) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
+      <div className={`overflow-x-auto ${className}`}>
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className={`bg-gray-50 dark:bg-gray-700 ${headerClassName}`}>
+            <tr>
+              {selectable && (
+                <th className="px-2 sm:px-4 py-2 w-12">
+                  <div className="h-4 w-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                </th>
+              )}
+              {columns.map((column, index) => (
+                <th
+                  key={index}
+                  className={`px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider ${
+                    column.hidden ? 'hidden' : column.responsive || ''
+                  }`}
+                >
+                  <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse w-20"></div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {[...Array(5)].map((_, rowIndex) => (
+              <tr key={rowIndex}>
+                {selectable && (
+                  <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                    <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </td>
+                )}
+                {columns.map((column, colIndex) => (
+                  <td
+                    key={colIndex}
+                    className={`px-2 sm:px-4 py-2 whitespace-nowrap ${
+                      column.hidden ? 'hidden' : column.responsive || ''
+                    }`}
+                  >
+                    <div className="h-4 bg-gray-100 dark:bg-gray-700/50 rounded animate-pulse w-full"></div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   }
